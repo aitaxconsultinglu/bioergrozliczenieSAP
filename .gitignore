@@ -1,0 +1,10 @@
+# Cennik kontraktowy Synthos - poufny, ladowany wprost do Supabase (repo jest publiczne)
+docs/cennik_synthos_pelny.csv
+*.csv
+*.xlsx
+
+node_modules
+dist
+*.tsbuildinfo
+.env
+.env.local
