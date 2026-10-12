@@ -12,6 +12,7 @@ interface Wiersz {
   ilosc_rbg: number
   status: StatusBraku
   opis: string | null
+  stanowisko_tekst: string | null
   utworzono: string
   zmieniono_status: string | null
   zlecenie_id: string
@@ -35,7 +36,7 @@ export function BrakiGodzin({ profil, otworz }: { profil: Profil; otworz: (id: s
   const wczytaj = useCallback(async () => {
     const { data, error } = await supabase
       .from('braki_godzin')
-      .select('id, ilosc_rbg, status, opis, utworzono, zmieniono_status, zlecenie_id, zlecenia(mpk, nazwa, nr_zamowienia), cennik_pozycje(opis)')
+      .select('id, ilosc_rbg, status, opis, stanowisko_tekst, utworzono, zmieniono_status, zlecenie_id, zlecenia(mpk, nazwa, nr_zamowienia), cennik_pozycje(opis)')
       .order('utworzono', { ascending: false })
       .limit(2000)
     if (error) { setBlad(komunikatPL(error.message)); return }
@@ -117,7 +118,7 @@ export function BrakiGodzin({ profil, otworz }: { profil: Profil; otworz: (id: s
                     <span className="font-mono text-xs">{w.zlecenia.nr_zamowienia ?? '-'}</span> {w.zlecenia.nazwa}
                   </button>
                 </td>
-                <td className="komorka text-sm">{w.cennik_pozycje?.opis ?? '-'}</td>
+                <td className="komorka text-sm">{w.cennik_pozycje?.opis ?? w.stanowisko_tekst ?? '-'}</td>
                 <td className="komorka liczba font-medium">{liczba(w.ilosc_rbg)}</td>
                 <td className="komorka text-sm">{w.opis}</td>
                 <td className="komorka">

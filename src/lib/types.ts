@@ -1,7 +1,8 @@
 export type Rola = 'kierownik' | 'handlowiec'
 export type StatusZlecenia = 'roboczy' | 'zlozony' | 'zwrocony' | 'wyeksportowany'
 export type StatusBraku = 'zgloszony' | 'uzupelniony' | 'rozliczony'
-export type Dostawca = 'bioerg' | 'synthos'
+/** 'bioerg', 'synthos' albo dowolny wpisany tekst (lista jest otwarta). */
+export type Dostawca = string
 
 export interface Profil {
   id: string
@@ -65,9 +66,14 @@ export interface Zlecenie {
 export interface PozycjaUslugi {
   id?: number
   klucz: string
-  cennik_pozycja_id: number
+  /** null = pozycja spoza cennika (wlasny_opis + wlasna_cena) */
+  cennik_pozycja_id: number | null
   ilosc: number
   cena?: number
+  wlasny_opis?: string | null
+  wlasna_jm?: string | null
+  wlasna_cena?: number | null
+  wlasny_indeks?: string | null
   doplata_proc: number
   doplata_opis: string | null
   mpk_wykonawcy: string | null
@@ -107,6 +113,7 @@ export interface BrakGodzin {
   id?: number
   klucz: string
   cennik_pozycja_id: number | null
+  stanowisko_tekst: string | null
   ilosc_rbg: number
   status: StatusBraku
   opis: string | null

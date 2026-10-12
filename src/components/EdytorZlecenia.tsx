@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
 import { PoleLiczby } from './PoleLiczby'
+import { PoleWyboru } from './PoleWyboru'
 import { SiatkaRobocizny } from './zlecenie/SiatkaRobocizny'
 import { PozycjeCennikowe } from './zlecenie/PozycjeCennikowe'
 import { TabelaMaterialow } from './zlecenie/TabelaMaterialow'
@@ -74,6 +75,8 @@ function zBazy(z: any): Stan {
     uslugi: [...(z.pozycje_uslug ?? [])].sort((a: any, b: any) => a.kolejnosc - b.kolejnosc || a.id - b.id).map((u: any) => ({
       id: u.id, klucz: `u${u.id}`, cennik_pozycja_id: u.cennik_pozycja_id, ilosc: Number(u.ilosc), cena: Number(u.cena),
       doplata_proc: Number(u.doplata_proc), doplata_opis: u.doplata_opis, mpk_wykonawcy: u.mpk_wykonawcy, opis: u.opis,
+      wlasny_opis: u.wlasny_opis, wlasna_jm: u.wlasna_jm, wlasny_indeks: u.wlasny_indeks,
+      wlasna_cena: u.wlasna_cena === null ? null : Number(u.wlasna_cena),
     })),
     materialy: [...(z.pozycje_materialowe ?? [])].sort((a: any, b: any) => a.kolejnosc - b.kolejnosc || a.id - b.id).map((m: any) => ({
       id: m.id, klucz: `m${m.id}`, nazwa: m.nazwa, ilosc: Number(m.ilosc), jm: m.jm, wartosc_zakupu: Number(m.wartosc_zakupu),
@@ -87,7 +90,7 @@ function zBazy(z: any): Stan {
       opis_uszkodzenia: k.opis_uszkodzenia ?? '', dane: k.dane ?? {},
     })),
     braki: [...(z.braki_godzin ?? [])].sort((a: any, b: any) => a.id - b.id).map((b: any) => ({
-      id: b.id, klucz: `b${b.id}`, cennik_pozycja_id: b.cennik_pozycja_id, ilosc_rbg: Number(b.ilosc_rbg), status: b.status, opis: b.opis,
+      id: b.id, klucz: `b${b.id}`, cennik_pozycja_id: b.cennik_pozycja_id, stanowisko_tekst: b.stanowisko_tekst, ilosc_rbg: Number(b.ilosc_rbg), status: b.status, opis: b.opis,
     })),
   }
 }
@@ -194,7 +197,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
   const sumy = useMemo(() => policzSumy(uslugi, materialy, cennik), [uslugi, materialy, cennik])
 
   const wymaganeKarty = useMemo(() => Math.ceil(uslugi.reduce((s, u) => {
-    const p = cennik.get(u.cennik_pozycja_id)
+    const p = u.cennik_pozycja_id === null ? undefined : cennik.get(u.cennik_pozycja_id)
     return p && kategorie.get(p.nr_pozycji)?.wymaga_karty ? s + u.ilosc : s
   }, 0)), [uslugi, cennik, kategorie])
 
@@ -214,9 +217,12 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
     if (!naglowek.nazwa.trim()) return 'Wpisz nazwę zlecenia (np. „POMPA 3X9K NR 422”).'
     if (!naglowek.mpk) return 'Wybierz MPK.'
     if (naglowek.pozycja_zamowienia && !/^\d+$/.test(naglowek.pozycja_zamowienia)) return 'Pozycja zamówienia musi być liczbą (np. 10, 20).'
+    const spoza = uslugi.filter((u) => u.cennik_pozycja_id === null && u.ilosc > 0)
+    if (spoza.some((u) => !(u.wlasny_opis ?? '').trim())) return 'Pozycja spoza cennika musi mieć opis pracy.'
     const mat = bezPustychMaterialow(materialy)
     if (mat.some((m) => !m.nazwa.trim())) return 'Uzupełnij nazwę materiału we wszystkich wierszach (albo usuń puste wiersze).'
     if (mat.some((m) => !(m.ilosc > 0))) return 'Ilość materiału musi być większa od zera.'
+    if (mat.some((m) => !m.dostawca.trim())) return 'Wpisz, kto dostarczył materiał (albo wybierz Bioerg / Synthos).'
     return null
   }
 
@@ -329,10 +335,15 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
     const z: ZlecenieDoEksportu = {
       id: idZrodla ?? '', mpk: naglowek.mpk, nr_zamowienia: naglowek.nr_zamowienia, nazwa: naglowek.nazwa,
       pozycja_zamowienia: naglowek.pozycja_zamowienia ? Number(naglowek.pozycja_zamowienia) : null,
-      pozycje_uslug: uslugi.filter((u) => u.ilosc > 0 && cennik.has(u.cennik_pozycja_id)).map((u, i) => ({
-        ilosc: u.ilosc, cena: u.cena ?? cennik.get(u.cennik_pozycja_id)!.cena, doplata_proc: u.doplata_proc,
-        kolejnosc: i, cennik_pozycje: cennik.get(u.cennik_pozycja_id)!,
-      })),
+      pozycje_uslug: uslugi
+        .filter((u) => u.ilosc > 0 && (u.cennik_pozycja_id === null || cennik.has(u.cennik_pozycja_id)))
+        .map((u, i) => {
+          const c = u.cennik_pozycja_id === null ? null : cennik.get(u.cennik_pozycja_id)!
+          return {
+            ilosc: u.ilosc, cena: u.cena ?? c?.cena ?? u.wlasna_cena ?? 0, doplata_proc: u.doplata_proc,
+            kolejnosc: i, cennik_pozycje: c, wlasny_opis: u.wlasny_opis, wlasna_jm: u.wlasna_jm, wlasny_indeks: u.wlasny_indeks,
+          }
+        }),
       pozycje_materialowe: bezPustychMaterialow(materialy).map((m, i) => ({ ...m, kolejnosc: i })),
     }
     return wierszeSap(z, materialWgKategorii)
@@ -486,11 +497,18 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
                 return (
                   <tr key={b.klucz}>
                     <td className="komorka p-0">
-                      <select className="pole-komorki" disabled={!edytowalny} value={b.cennik_pozycja_id ?? ''}
-                        onChange={(e) => zmien({ cennik_pozycja_id: e.target.value ? Number(e.target.value) : null })}>
-                        <option value="">(nie dotyczy stanowiska)</option>
-                        {stawki.map((s) => <option key={s.cennik_pozycja_id} value={s.cennik_pozycja_id}>{s.stanowisko} {s.pora !== 'stala' ? `(${s.pora})` : ''}</option>)}
-                      </select>
+                      <PoleWyboru
+                        wKomorce
+                        disabled={!edytowalny}
+                        aria-label="Stanowisko"
+                        pusta="(nie dotyczy stanowiska)"
+                        placeholderInne="wpisz stanowisko"
+                        opcje={stawki.map((s) => ({ wartosc: `id:${s.cennik_pozycja_id}`, etykieta: `${s.stanowisko}${s.pora !== 'stala' ? ` (${s.pora})` : ''}` }))}
+                        wartosc={b.cennik_pozycja_id ? `id:${b.cennik_pozycja_id}` : b.stanowisko_tekst ?? ''}
+                        zmien={(w) => zmien(w.startsWith('id:')
+                          ? { cennik_pozycja_id: Number(w.slice(3)), stanowisko_tekst: null }
+                          : { cennik_pozycja_id: null, stanowisko_tekst: w || null })}
+                      />
                     </td>
                     <td className="komorka p-0"><PoleLiczby wartosc={b.ilosc_rbg} disabled={!edytowalny} zmien={(n) => zmien({ ilosc_rbg: n })} aria-label="Rbg braku" /></td>
                     <td className="komorka p-0"><input className="pole-komorki" disabled={!edytowalny} value={b.opis ?? ''} onChange={(e) => zmien({ opis: e.target.value })} /></td>
@@ -510,7 +528,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
         )}
         {edycja && (
           <button className="text-sm text-blekit-ciemny hover:underline"
-            onClick={() => ustaw('braki')([...braki, { klucz: nowyKlucz(), cennik_pozycja_id: null, ilosc_rbg: 0, status: 'zgloszony', opis: null }])}>
+            onClick={() => ustaw('braki')([...braki, { klucz: nowyKlucz(), cennik_pozycja_id: null, stanowisko_tekst: null, ilosc_rbg: 0, status: 'zgloszony', opis: null }])}>
             + Zgłoś brak godzin
           </button>
         )}

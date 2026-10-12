@@ -22,7 +22,8 @@ export function wartoscUslugi(p: Pick<PozycjaUslugi, 'ilosc' | 'doplata_proc'>, 
 /**
  * Materiał: wpisywana jest ŁĄCZNA wartość z faktury (tak jak w dotychczasowym Excelu),
  * narzut liczony od niej. Materiał dostarczony przez Synthos ma narzut 0 (pilnuje tego
- * też trigger w bazie) i nie trafia do eksportu wartościowego.
+ * też trigger w bazie) i nie trafia do eksportu wartościowego. Inny wpisany dostawca
+ * (np. "z demontażu") liczy się normalnie, z narzutem ustawionym w wierszu.
  */
 export function wartoscMaterialu(m: Pick<PozycjaMaterialowa, 'wartosc_zakupu' | 'narzut_proc'>) {
   return grosze(m.wartosc_zakupu * (1 + (m.narzut_proc || 0) / 100))
@@ -33,6 +34,11 @@ export function cenaJednMaterialu(m: Pick<PozycjaMaterialowa, 'wartosc_zakupu' |
   return grosze(wartoscMaterialu(m) / m.ilosc)
 }
 
+/** Materiał Synthos rozpoznajemy po nazwie dostawcy - tak samo jak funkcja czy_synthos() w bazie. */
+export function czySynthos(dostawca: string | null | undefined) {
+  return /synthos/i.test(dostawca ?? '')
+}
+
 export interface Sumy {
   robocizna: number
   cennik: number
@@ -41,13 +47,18 @@ export interface Sumy {
 }
 
 export function policzSumy(
-  uslugi: Pick<PozycjaUslugi, 'cennik_pozycja_id' | 'ilosc' | 'doplata_proc' | 'cena'>[],
+  uslugi: Pick<PozycjaUslugi, 'cennik_pozycja_id' | 'ilosc' | 'doplata_proc' | 'cena' | 'wlasna_cena'>[],
   materialy: Pick<PozycjaMaterialowa, 'wartosc_zakupu' | 'narzut_proc' | 'dostawca'>[],
   cennik: Map<number, PozycjaCennika>,
 ): Sumy {
   let robocizna = 0
   let pozycjeCennikowe = 0
   for (const u of uslugi) {
+    if (u.cennik_pozycja_id === null) {
+      // Pozycja spoza cennika - cena wpisana ręcznie.
+      pozycjeCennikowe += wartoscUslugi(u, u.cena ?? u.wlasna_cena ?? 0)
+      continue
+    }
     const poz = cennik.get(u.cennik_pozycja_id)
     if (!poz) continue
     // Zapisana pozycja ma zamrożoną cenę z chwili wpisu; nowa - bieżącą z cennika.
@@ -55,7 +66,7 @@ export function policzSumy(
     if (poz.nr_pozycji === 310) robocizna += w
     else pozycjeCennikowe += w
   }
-  const mat = materialy.filter((m) => m.dostawca === 'bioerg').reduce((s, m) => s + wartoscMaterialu(m), 0)
+  const mat = materialy.filter((m) => !czySynthos(m.dostawca)).reduce((s, m) => s + wartoscMaterialu(m), 0)
   return {
     robocizna: grosze(robocizna),
     cennik: grosze(pozycjeCennikowe),

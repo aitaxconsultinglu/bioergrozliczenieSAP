@@ -34,8 +34,9 @@ export function SiatkaRobocizny({ uslugi, ustaw, mpkZlecenia, edycja }: Props) {
     return [...m.entries()]
   }, [stawki])
 
-  const wlasne = uslugi.filter((u) => idStawek.has(u.cennik_pozycja_id) && !u.mpk_wykonawcy)
-  const kooperacja = uslugi.filter((u) => idStawek.has(u.cennik_pozycja_id) && u.mpk_wykonawcy)
+  const czyStawka = (u: PozycjaUslugi) => u.cennik_pozycja_id !== null && idStawek.has(u.cennik_pozycja_id)
+  const wlasne = uslugi.filter((u) => czyStawka(u) && !u.mpk_wykonawcy)
+  const kooperacja = uslugi.filter((u) => czyStawka(u) && u.mpk_wykonawcy)
 
   function ustawGodziny(stawka: Stawka, godziny: number) {
     const istniejaca = wlasne.find((u) => u.cennik_pozycja_id === stawka.cennik_pozycja_id)
@@ -147,7 +148,7 @@ export function SiatkaRobocizny({ uslugi, ustaw, mpkZlecenia, edycja }: Props) {
                     </select>
                   </td>
                   <td className="komorka p-0">
-                    <select className="pole-komorki" disabled={!edycja} value={u.cennik_pozycja_id}
+                    <select className="pole-komorki" disabled={!edycja} value={u.cennik_pozycja_id ?? ''}
                       onChange={(e) => ustaw(uslugi.map((x) => (x === u ? { ...x, cennik_pozycja_id: Number(e.target.value), cena: undefined } : x)))}>
                       {stawki.map((s) => (
                         <option key={s.cennik_pozycja_id} value={s.cennik_pozycja_id}>

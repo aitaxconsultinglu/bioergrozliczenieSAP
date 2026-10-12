@@ -125,6 +125,29 @@ export const SZABLONY: Record<string, Szablon> = {
     ],
     doplaty: [{ opis: 'Przezwojenie', proc: 10 }],
   },
+  inne: {
+    id: 'inne',
+    nazwa: 'Inne urządzenie / praca nietypowa',
+    opis: 'Karta ogólna, gdy żaden szablon nie pasuje - wszystko opisowo.',
+    etykiety: {
+      urzadzenie_nazwa: 'Nazwa urządzenia / obiektu',
+      urzadzenie_typ: 'Rodzaj / typ',
+      urzadzenie_nr: 'Numer / oznaczenie',
+      mechanik_przekazujacy: 'Przekazał (Synthos)',
+      mechanik_przyjmujacy: 'Wykonał / przyjął (Bioerg)',
+      opis_uszkodzenia: 'Opis usterki / zlecenia',
+    },
+    polaZlecenia: [],
+    polaKarty: [
+      { klucz: 'miejsce_pracy', etykieta: 'Miejsce (budynek / instalacja)', typ: 'tekst' },
+      { klucz: 'wykonane_prace', etykieta: 'Wykonane prace', typ: 'dlugi', szerokie: true },
+      { klucz: 'kontrola_wynik', etykieta: 'Kontrola końcowa - wynik', typ: 'wybor', opcje: WYNIK_KONTROLI },
+      { klucz: 'kontrola_osoba', etykieta: 'Kontrolę przeprowadził', typ: 'tekst' },
+      { klucz: 'uwagi', etykieta: 'Uwagi', typ: 'dlugi', szerokie: true },
+    ],
+    zakresRemontu: [],
+    doplaty: [],
+  },
 }
 
 export const SZABLON_DOMYSLNY = 'urzadzenie'

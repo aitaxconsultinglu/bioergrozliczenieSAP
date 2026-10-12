@@ -15,9 +15,13 @@
  *     a Krótki tekst = nazwa materiału (max 40 znaków - limit krótkiego tekstu SAP).
  *  3. Dopłata procentowa (przezwojenie +10%) jest wliczona w cenę pozycji.
  *  4. "Pozostało" i "Nr Mat. dostawcy" zostają puste.
- *  5. Materiał dostarczony przez Synthos nie jest eksportowany (brak wartości do rozliczenia).
+ *  5. Materiał dostarczony przez Synthos (narzut 0%) nie jest eksportowany - brak wartości
+ *     do rozliczenia. Materiał od innego wpisanego dostawcy jest eksportowany normalnie.
+ *  6. Pozycja spoza cennika: pusty "Numer linii" (Synthos nadaje go w SAP), indeks SAP
+ *     jeśli kierownik go wpisał, opis/JM/cena wpisane ręcznie. Panel oznacza takie
+ *     zlecenia do weryfikacji przez dział handlowy.
  */
-import { cenaJednMaterialu, cenaUslugi, grosze, wartoscMaterialu, wartoscUslugi } from './obliczenia'
+import { cenaJednMaterialu, cenaUslugi, czySynthos, grosze, wartoscMaterialu, wartoscUslugi } from './obliczenia'
 import type { Dostawca, PozycjaCennika } from './types'
 
 export const KOLUMNY_SAP = [
@@ -26,7 +30,7 @@ export const KOLUMNY_SAP = [
 ] as const
 
 export type KomorkaSap = string | number | null
-export type WierszSap = [number, string, string, number, null, string, number, number, number | null, number | null, null]
+export type WierszSap = [number | null, string, string, number, null, string, number, number, number | null, number | null, null]
 
 export const INDEKS_MATERIALU = '5004062'
 export const GRUPA_ROBOCIZNY = 310
@@ -43,7 +47,11 @@ export interface ZlecenieDoEksportu {
     cena: number
     doplata_proc: number
     kolejnosc: number
-    cennik_pozycje: PozycjaCennika
+    /** null = pozycja spoza cennika */
+    cennik_pozycje: PozycjaCennika | null
+    wlasny_opis?: string | null
+    wlasna_jm?: string | null
+    wlasny_indeks?: string | null
   }[]
   pozycje_materialowe: {
     nazwa: string
@@ -65,19 +73,26 @@ export type MaterialWgKategorii = Map<number, PozycjaCennika>
  */
 function kategoriaMaterialu(z: ZlecenieDoEksportu, materialy: MaterialWgKategorii): PozycjaCennika | undefined {
   const pierwsza = z.pozycje_uslug
-    .map((u) => u.cennik_pozycje.nr_pozycji)
-    .find((nr) => nr !== GRUPA_ROBOCIZNY && materialy.has(nr))
+    .map((u) => u.cennik_pozycje?.nr_pozycji)
+    .find((nr): nr is number => nr !== undefined && nr !== GRUPA_ROBOCIZNY && materialy.has(nr))
   return materialy.get(pierwsza ?? GRUPA_ROBOCIZNY) ?? materialy.get(GRUPA_ROBOCIZNY)
 }
 
 export function wierszeSap(z: ZlecenieDoEksportu, materialy: MaterialWgKategorii): WierszSap[] {
   const wiersze: WierszSap[] = []
-  const uslugi = [...z.pozycje_uslug].sort(
-    (a, b) => a.cennik_pozycje.nr_pozycji - b.cennik_pozycje.nr_pozycji
-      || a.cennik_pozycje.numer_linii - b.cennik_pozycje.numer_linii,
-  )
+  // Pozycje z cennika wg kategorii i linii; pozycje spoza cennika na końcu, w kolejności wpisu.
+  const klucz = (u: ZlecenieDoEksportu['pozycje_uslug'][number]) =>
+    u.cennik_pozycje ? u.cennik_pozycje.nr_pozycji * 100000 + u.cennik_pozycje.numer_linii : 1e12 + u.kolejnosc
+  const uslugi = [...z.pozycje_uslug].sort((a, b) => klucz(a) - klucz(b))
   for (const u of uslugi) {
     const c = u.cennik_pozycje
+    if (!c) {
+      wiersze.push([
+        null, u.wlasny_indeks ?? '', (u.wlasny_opis ?? '').slice(0, MAKS_KROTKI_TEKST), Number(u.ilosc), null,
+        u.wlasna_jm ?? 'JD', cenaUslugi(u, Number(u.cena)), wartoscUslugi(u, Number(u.cena)), null, null, null,
+      ])
+      continue
+    }
     wiersze.push([
       c.numer_linii, c.indeks_sap, c.opis.slice(0, MAKS_KROTKI_TEKST), Number(u.ilosc), null, c.jm,
       cenaUslugi(u, Number(u.cena)), wartoscUslugi(u, Number(u.cena)), null, null, null,
@@ -85,7 +100,7 @@ export function wierszeSap(z: ZlecenieDoEksportu, materialy: MaterialWgKategorii
   }
   const mat = kategoriaMaterialu(z, materialy)
   for (const m of [...z.pozycje_materialowe].sort((a, b) => a.kolejnosc - b.kolejnosc)) {
-    if (m.dostawca !== 'bioerg') continue
+    if (czySynthos(m.dostawca)) continue
     const wartosc = wartoscMaterialu(m)
     wiersze.push([
       mat?.numer_linii ?? 0, INDEKS_MATERIALU, m.nazwa.slice(0, MAKS_KROTKI_TEKST), wartosc, null,
@@ -93,6 +108,11 @@ export function wierszeSap(z: ZlecenieDoEksportu, materialy: MaterialWgKategorii
     ])
   }
   return wiersze
+}
+
+/** Czy zlecenie zawiera pozycje spoza cennika - dział handlowy powinien je sprawdzić. */
+export function maPozycjeSpozaCennika(z: ZlecenieDoEksportu) {
+  return z.pozycje_uslug.some((u) => !u.cennik_pozycje)
 }
 
 export function sumaWierszy(wiersze: WierszSap[]) {

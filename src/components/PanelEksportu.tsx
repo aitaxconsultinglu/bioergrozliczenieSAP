@@ -5,7 +5,7 @@ import { useSlowniki } from '@/lib/slowniki'
 import { komunikatPL } from '@/lib/config'
 import { dataGodzinaPL, dzisiajISO, zl } from '@/lib/format'
 import {
-  KOLUMNY_SAP, etykietaZamowienia, pobierz, plikXlsx, sumaWierszy, tekstDoSchowka, wierszeSap,
+  KOLUMNY_SAP, etykietaZamowienia, maPozycjeSpozaCennika, pobierz, plikXlsx, sumaWierszy, tekstDoSchowka, wierszeSap,
   type ZlecenieDoEksportu,
 } from '@/lib/eksportSap'
 import { cn } from '@/lib/utils'
@@ -13,7 +13,7 @@ import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
 
 const ZAPYTANIE = `id, mpk, nr_zamowienia, pozycja_zamowienia, nazwa, mechanik, zlozono,
-  pozycje_uslug(ilosc, cena, doplata_proc, kolejnosc, cennik_pozycje(*)),
+  pozycje_uslug(ilosc, cena, doplata_proc, kolejnosc, wlasny_opis, wlasna_jm, wlasny_indeks, cennik_pozycje(*)),
   pozycje_materialowe(nazwa, ilosc, wartosc_zakupu, narzut_proc, dostawca, kolejnosc)`
 
 type ZlecenieZPanelu = ZlecenieDoEksportu & { mechanik: string | null; zlozono: string | null }
@@ -31,7 +31,7 @@ function normalizuj(z: any): ZlecenieZPanelu {
     ...z,
     pozycje_uslug: z.pozycje_uslug.map((u: any) => ({
       ...u, ilosc: Number(u.ilosc), cena: Number(u.cena), doplata_proc: Number(u.doplata_proc),
-      cennik_pozycje: { ...u.cennik_pozycje, cena: Number(u.cennik_pozycje.cena) },
+      cennik_pozycje: u.cennik_pozycje ? { ...u.cennik_pozycje, cena: Number(u.cennik_pozycje.cena) } : null,
     })),
     pozycje_materialowe: z.pozycje_materialowe.map((m: any) => ({
       ...m, ilosc: Number(m.ilosc), wartosc_zakupu: Number(m.wartosc_zakupu), narzut_proc: Number(m.narzut_proc),
@@ -169,6 +169,12 @@ export function PanelEksportu({ otworz }: { otworz: (id: string) => void }) {
                     <td className="komorka font-mono">{etykietaZamowienia(z)}</td>
                     <td className="komorka">
                       <button className="text-left hover:underline" onClick={() => otworz(z.id)}>{z.nazwa}</button>
+                      {maPozycjeSpozaCennika(z) && (
+                        <span className="ml-2 rounded bg-amber-50 px-1.5 text-xs text-amber-800 ring-1 ring-amber-300"
+                          title="Kierownik dodał pozycję spoza cennika - sprawdź opis, cenę i indeks SAP przed wklejeniem">
+                          pozycja spoza cennika
+                        </span>
+                      )}
                     </td>
                     <td className="komorka">{z.mpk}</td>
                     <td className="komorka whitespace-nowrap text-xs text-slate-500">{dataGodzinaPL(z.zlozono)}</td>

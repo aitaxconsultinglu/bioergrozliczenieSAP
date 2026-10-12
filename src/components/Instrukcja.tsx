@@ -1,0 +1,140 @@
+import type { ReactNode } from 'react'
+import type { Profil } from '@/lib/types'
+
+function Krok({ nr, tytul, children }: { nr: number | string; tytul: string; children: ReactNode }) {
+  return (
+    <li className="flex gap-3">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-limonka text-sm font-semibold">{nr}</span>
+      <div className="pb-2">
+        <p className="font-medium">{tytul}</p>
+        <div className="mt-0.5 space-y-1 text-sm text-slate-700">{children}</div>
+      </div>
+    </li>
+  )
+}
+
+const Uwaga = ({ children }: { children: ReactNode }) => (
+  <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-amber-200">{children}</p>
+)
+
+/** Instrukcja wbudowana w aplikację - kierownik widzi swoją część, dział handlowy obie. */
+export function Instrukcja({ profil }: { profil: Profil }) {
+  const handlowiec = profil.rola === 'handlowiec'
+  return (
+    <div className="mx-auto max-w-4xl space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold">Instrukcja</h2>
+        <p className="text-sm text-slate-500">Jak rozliczyć pracę dla Synthos od karty kierownika do wpisu w SAP.</p>
+      </div>
+
+      <section className="sekcja space-y-3">
+        <h3 className="font-semibold">Jak to działa w skrócie</h3>
+        <ol className="grid gap-3 sm:grid-cols-3">
+          <li className="rounded-md bg-slate-50 p-3 text-sm">
+            <p className="font-semibold">1. Kierownik wydziału</p>
+            Po remoncie wpisuje zlecenie: numer zamówienia SAP, robociznę, materiały i karty remontowe.
+            Klika <strong>„Złóż do rozliczenia”</strong>.
+          </li>
+          <li className="rounded-md bg-slate-50 p-3 text-sm">
+            <p className="font-semibold">2. Dział handlowy</p>
+            Widzi złożone zlecenia, sprawdza je i jednym kliknięciem kopiuje gotowe linie w układzie SAP
+            (albo pobiera plik XLSX).
+          </li>
+          <li className="rounded-md bg-slate-50 p-3 text-sm">
+            <p className="font-semibold">3. SAP Synthos</p>
+            Dział handlowy wkleja linie w rozliczenie zamówienia w SAP i oznacza zlecenie w aplikacji jako
+            <strong> „wyeksportowane”</strong>.
+          </li>
+        </ol>
+        <p className="text-sm text-slate-700">
+          Gdy coś się nie zgadza, dział handlowy <strong>zwraca zlecenie do poprawki</strong> z komentarzem. Kierownik
+          poprawia je i składa ponownie. Ceny i indeksy SAP pochodzą zawsze z cennika kontraktowego, więc nikt nie musi
+          ich przepisywać ani pilnować aktualnych stawek.
+        </p>
+        <p className="text-sm text-slate-700">
+          <strong>Pierwsze logowanie:</strong> login to służbowy e-mail, hasło tymczasowe dostajesz od administratora.
+          Aplikacja od razu poprosi o ustawienie własnego hasła (min. 6 znaków, w tym jeden znak specjalny).
+        </p>
+      </section>
+
+      <section className="sekcja space-y-3">
+        <h3 className="font-semibold">Dla kierownika - wpisanie zlecenia</h3>
+        <ol className="space-y-2">
+          <Krok nr={1} tytul="Nowe zlecenie">
+            <p>„Moje zlecenia” → <strong>Nowe zlecenie</strong>. Gdy robisz kolejny remont tego samego typu (np. znowu pompa 3X9K),
+              otwórz poprzednie i kliknij <strong>„Kopiuj jako nowe”</strong>. Przepisze się nagłówek i pozycje, a numer zamówienia, materiały i karty wpisujesz na nowo.</p>
+          </Krok>
+          <Krok nr={2} tytul="Dane zlecenia (to, co było na górze karty w Excelu)">
+            <p><strong>Nazwa</strong>: np. „POMPA 3X9K NR 422”. <strong>Nr zamówienia SAP</strong>: numer 4200… z FIORI. Aplikacja podpowiada numery wpisane wcześniej.
+              <strong> Pozycja zamówienia</strong>: końcówka typu -10 / -20, jeśli zamówienie ma kilka pozycji.
+              <strong> Konto</strong> (np. URR/1/2026/BZ), <strong>Mechanik</strong>, daty.</p>
+            <p><strong>Rodzaj karty</strong>: pompa/urządzenie, silnik elektryczny albo „inne” dla nietypowej pracy.</p>
+          </Krok>
+          <Krok nr={3} tytul="Robocizna wg cennika">
+            <p>Wpisz w wyszukiwarkę fragment nazwy z umowy, np. <em>„3x9k”</em>, <em>„siln 7,5 1400”</em> albo <em>„uszczelek”</em>, i kliknij pozycję.
+              <strong> Ilość</strong> to liczba sztuk (5 pomp = 5). Cena podstawia się sama z cennika.</p>
+            <p><strong>Dopłata</strong>: przy silniku wybierz „Przezwojenie +10%”, a każdą inną dopłatę wpisz przez „inna (wpisz)”.
+              Pod pozycją możesz dopisać uwagi, np. wykaz uszczelek albo numery urządzeń.</p>
+            <p>Pracy nie ma w cenniku? Użyj przycisku <strong>„Pozycja spoza cennika”</strong> i wpisz opis oraz cenę ręcznie. Dział handlowy zobaczy ją oznaczoną do sprawdzenia.</p>
+          </Krok>
+          <Krok nr={4} tytul="Robocizna wg rbg (godziny)">
+            <p>Wpisz liczbę roboczogodzin w kratce <strong>stanowisko × pora dnia</strong> (7–15, 15–19, 19–7, dni wolne). Stawka bierze się z cennika.</p>
+            <p>Godziny przepracowane przez ludzi z innego MPK dodaj w części <strong>„Kooperacja z innym MPK”</strong>. Zastępuje to dopiski typu „20 RBG DLA SPORYSZ”.</p>
+          </Krok>
+          <Krok nr={5} tytul="Materiały">
+            <p>Jeden wiersz na pozycję z faktury: nazwa, ilość, JM i <strong>łączna wartość zakupu z faktury</strong>, tak jak dotąd w Excelu.
+              Cena z narzutem 15% liczy się sama. Enter w ostatniej kolumnie dodaje nowy wiersz.</p>
+            <p><strong>Dostarczył</strong>: Bioerg (narzut 15%), <strong>Synthos (narzut 0%, nie idzie do rozliczenia)</strong> albo „inne (wpisz)”, np. „z demontażu”. Przy innym dostawcy narzut ustawiasz sam.</p>
+          </Krok>
+          <Krok nr={6} tytul="Karty remontowe">
+            <p>Pompy, przekładnie i silniki z umowy wymagają karty remontowej, <strong>jednej na każdą sztukę</strong>. Aplikacja pokazuje, ile kart brakuje.
+              Przycisk <strong>„Dodaj brakujące karty”</strong> tworzy je z podpowiedzianym numerem KR.</p>
+            <p>Pola z czerwoną gwiazdką są obowiązkowe. Zakres remontu zaznaczasz na liście, a czynności spoza listy wpisujesz w polu „Inne czynności”.</p>
+          </Krok>
+          <Krok nr={7} tytul="Braki godzin">
+            <p>Jeśli zleceniodawca założył w zamówieniu za mało godzin, kliknij „+ Zgłoś brak godzin”. Dział handlowy będzie pilnował uzupełnienia.</p>
+          </Krok>
+          <Krok nr={8} tytul="Zapisz i złóż">
+            <p><strong>Zapisz</strong> możesz klikać w każdej chwili, nawet z niepełnymi danymi, bo to wersja robocza.
+              Na koniec kliknij <strong>„Złóż do rozliczenia”</strong>. Aplikacja nie przepuści zlecenia bez numeru zamówienia i bez kompletnych kart.</p>
+            <p>Po złożeniu zlecenie jest zablokowane. Jeśli dział handlowy je zwróci, zobaczysz żółty komunikat z opisem, co poprawić. Popraw i złóż ponownie.</p>
+            <p><strong>Drukuj</strong> drukuje zlecenie z kartami, np. do podpisu.</p>
+          </Krok>
+        </ol>
+      </section>
+
+      {handlowiec && (
+        <section className="sekcja space-y-3">
+          <h3 className="font-semibold">Dla działu handlowego - wprowadzenie do SAP</h3>
+          <ol className="space-y-2">
+            <Krok nr={1} tytul="Zakładka „Eksport do SAP”">
+              <p>Lista zleceń złożonych przez kierowników. Strzałka przy zleceniu pokazuje dokładnie te linie, które trafią do SAP
+                (Numer linii, Numer usługi, Krótki tekst, Ilość, …). Klik w nazwę otwiera całe zlecenie.</p>
+              <p>Zlecenia z żółtym oznaczeniem <strong>„pozycja spoza cennika”</strong> wymagają sprawdzenia opisu, ceny i indeksu.</p>
+            </Krok>
+            <Krok nr={2} tytul="Wklejenie do SAP">
+              <p><strong>Kopiuj</strong> przy zleceniu kopiuje jego linie do schowka. W SAP otwórz rozliczenie tego zamówienia i wklej (Ctrl+V).</p>
+              <p>Można też zaznaczyć kilka zleceń i kliknąć <strong>„Pobierz XLSX”</strong>. Plik ma arkusz z zestawieniem i osobny arkusz dla każdego zamówienia.</p>
+            </Krok>
+            <Krok nr={3} tytul="Oznacz jako wyeksportowane">
+              <p>Po wprowadzeniu do SAP zaznacz zlecenia i kliknij <strong>„Oznacz jako wyeksportowane”</strong>. Znikną z listy i będą zablokowane, więc nic nie zostanie wklejone dwa razy.
+                Pomyłka? Otwórz zlecenie i kliknij <strong>„Cofnij eksport”</strong>. „Ostatnie eksporty” pozwalają pobrać dawny plik ponownie.</p>
+            </Krok>
+            <Krok nr={4} tytul="Poprawki">
+              <p>Drobny błąd możesz poprawić sama w zleceniu i kliknąć „Zapisz”. Jeśli poprawić musi kierownik, kliknij <strong>„Zwróć do poprawki”</strong> i napisz, co nie gra.</p>
+            </Krok>
+            <Krok nr={5} tytul="Braki godzin, cennik, użytkownicy">
+              <p><strong>Braki godzin</strong>: lista zgłoszonych braków z podsumowaniem na MPK. Zmieniasz w niej status: zgłoszony → uzupełniony przez klienta → rozliczony.</p>
+              <p><strong>Cennik</strong>: podgląd umowy. Wybierz kategorię, aby ustawić, czy wymaga karty remontowej i jakiej.</p>
+              <p><strong>Użytkownicy</strong>: zakładanie kont (hasło tymczasowe pokazuje się raz), przypisywanie MPK kierownikom, reset hasła.</p>
+            </Krok>
+          </ol>
+          <Uwaga>
+            Układ eksportu jest wstępny: numer linii z cennika, materiał jako pozycja 5004062 z ilością = wartość po 1 zł.
+            Sprawdź go na pierwszych zleceniach i zgłoś, czym różni się od tego, co faktycznie wklejasz do SAP. Poprawka jest szybka.
+          </Uwaga>
+        </section>
+      )}
+    </div>
+  )
+}

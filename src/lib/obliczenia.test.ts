@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { cenaJednMaterialu, cenaUslugi, grosze, wartoscMaterialu, wartoscUslugi } from './obliczenia'
-import { tekstDoSchowka, wierszeSap, type ZlecenieDoEksportu } from './eksportSap'
+import { cenaJednMaterialu, cenaUslugi, czySynthos, grosze, wartoscMaterialu, wartoscUslugi } from './obliczenia'
+import { maPozycjeSpozaCennika, tekstDoSchowka, wierszeSap, type ZlecenieDoEksportu } from './eksportSap'
 import type { PozycjaCennika } from './types'
 
 describe('grosze', () => {
@@ -63,5 +63,31 @@ describe('eksport SAP', () => {
   it('materiał Synthos nie trafia do eksportu', () => expect(wiersze).toHaveLength(3))
   it('schowek: tabulatory, przecinek dziesiętny, bez nagłówka', () => {
     expect(tekstDoSchowka([wiersze[2]])).toBe('2000\t5004062\tSIMMERING 35X55X10\t96,03\t\tJD\t1\t96,03\t9,6\t10\t')
+  })
+})
+
+describe('otwarte listy', () => {
+  it('Synthos rozpoznawany po nazwie, niezależnie od wielkości liter', () => {
+    expect(czySynthos('synthos')).toBe(true)
+    expect(czySynthos('Magazyn SYNTHOS')).toBe(true)
+    expect(czySynthos('bioerg')).toBe(false)
+    expect(czySynthos('z demontażu')).toBe(false)
+  })
+
+  it('pozycja spoza cennika: pusty numer linii, ręczny opis/JM/cena', () => {
+    const z: ZlecenieDoEksportu = {
+      id: 'y', mpk: 'P04', nr_zamowienia: '4200000001', pozycja_zamowienia: null, nazwa: 'Test',
+      pozycje_uslug: [{ ilosc: 2, cena: 150, doplata_proc: 0, kolejnosc: 0, cennik_pozycje: null,
+        wlasny_opis: 'Dorobienie tulei', wlasna_jm: 'szt', wlasny_indeks: null }],
+      pozycje_materialowe: [
+        { nazwa: 'Tuleja z demontażu', ilosc: 1, wartosc_zakupu: 100, narzut_proc: 10, dostawca: 'z demontażu', kolejnosc: 0 },
+        { nazwa: 'Uszczelka', ilosc: 1, wartosc_zakupu: 0, narzut_proc: 0, dostawca: 'Magazyn Synthos', kolejnosc: 1 },
+      ],
+    }
+    const w = wierszeSap(z, new Map())
+    expect(w[0]).toEqual([null, '', 'Dorobienie tulei', 2, null, 'szt', 150, 300, null, null, null])
+    expect(w).toHaveLength(2) // materiał "z demontażu" jest, Synthos nie
+    expect(w[1][3]).toBe(110)
+    expect(maPozycjeSpozaCennika(z)).toBe(true)
   })
 })

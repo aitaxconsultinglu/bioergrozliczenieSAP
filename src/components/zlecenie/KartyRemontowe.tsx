@@ -3,6 +3,7 @@ import { SZABLONY, brakiKarty, szablon, type Pole } from '@/lib/szablony'
 import { nowyKlucz } from '@/lib/obliczenia'
 import type { KartaRemontowa } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { PoleWyboru } from '../PoleWyboru'
 
 interface Props {
   karty: KartaRemontowa[]
@@ -126,9 +127,9 @@ function Karta({ karta, nr, edycja, zmien, usun }: {
         ))}
       </div>
 
-      {s.zakresRemontu.length > 0 && (
-        <div className="border-t border-slate-200 px-4 py-3">
-          <p className="etykieta">Zakres remontu</p>
+      <div className="border-t border-slate-200 px-4 py-3">
+        <p className="etykieta">Zakres remontu</p>
+        {s.zakresRemontu.length > 0 && (
           <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-4">
             {s.zakresRemontu.map((z) => (
               <label key={z.klucz} className="flex items-center gap-2 text-sm">
@@ -138,8 +139,12 @@ function Karta({ karta, nr, edycja, zmien, usun }: {
               </label>
             ))}
           </div>
-        </div>
-      )}
+        )}
+        {/* Lista czynności jest otwarta - wszystko, czego nie ma na liście, wpisuje się tutaj. */}
+        <input className="pole mt-2" disabled={!edycja} value={String(karta.dane.zakres_inne ?? '')}
+          placeholder="Inne czynności, których nie ma na liście (wpisz)" aria-label="Inne czynności"
+          onChange={(e) => ustawDane('zakres_inne', e.target.value)} />
+      </div>
     </div>
   )
 }
@@ -163,10 +168,8 @@ function PoleSzablonu({ pole, wartosc, edycja, zmien }: { pole: Pole; wartosc: u
     return (
       <label className={klasa}>
         {etykieta}
-        <select className="pole" disabled={!edycja} value={String(wartosc ?? '')} onChange={(e) => zmien(e.target.value)}>
-          <option value="">-</option>
-          {pole.opcje?.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
+        <PoleWyboru disabled={!edycja} pusta="-" wartosc={String(wartosc ?? '')} zmien={zmien}
+          opcje={(pole.opcje ?? []).map((o) => ({ wartosc: o, etykieta: o }))} />
       </label>
     )
   }

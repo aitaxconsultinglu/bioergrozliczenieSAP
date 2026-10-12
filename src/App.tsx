@@ -12,9 +12,10 @@ import { PanelEksportu } from './components/PanelEksportu'
 import { BrakiGodzin } from './components/BrakiGodzin'
 import { Cennik } from './components/Cennik'
 import { Uzytkownicy } from './components/Uzytkownicy'
+import { Instrukcja } from './components/Instrukcja'
 import { Button } from './components/ui/button'
 
-type Widok = 'zlecenia' | 'eksport' | 'braki' | 'cennik' | 'uzytkownicy'
+type Widok = 'zlecenia' | 'eksport' | 'braki' | 'cennik' | 'uzytkownicy' | 'instrukcja'
 
 export default function App() {
   const [sesja, setSesja] = useState<Session | null>(null)
@@ -109,11 +110,13 @@ function Aplikacja({ profil, zmienHaslo }: { profil: Profil; zmienHaslo: () => v
         { id: 'braki', etykieta: 'Braki godzin' },
         { id: 'cennik', etykieta: 'Cennik' },
         { id: 'uzytkownicy', etykieta: 'Użytkownicy' },
+        { id: 'instrukcja', etykieta: 'Instrukcja' },
       ]
     : [
         { id: 'zlecenia', etykieta: 'Moje zlecenia' },
         { id: 'braki', etykieta: 'Braki godzin' },
         { id: 'cennik', etykieta: 'Cennik' },
+        { id: 'instrukcja', etykieta: 'Instrukcja' },
       ]
 
   return (
@@ -180,6 +183,8 @@ function Aplikacja({ profil, zmienHaslo }: { profil: Profil; zmienHaslo: () => v
           <Cennik profil={profil} />
         ) : widok === 'uzytkownicy' && handlowiec ? (
           <Uzytkownicy profil={profil} />
+        ) : widok === 'instrukcja' ? (
+          <Instrukcja profil={profil} />
         ) : null}
       </main>
     </div>

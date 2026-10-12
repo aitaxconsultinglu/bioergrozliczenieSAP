@@ -1,8 +1,14 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { zl } from '@/lib/format'
-import { cenaJednMaterialu, nowyKlucz, wartoscMaterialu } from '@/lib/obliczenia'
+import { cenaJednMaterialu, czySynthos, nowyKlucz, wartoscMaterialu } from '@/lib/obliczenia'
 import type { PozycjaMaterialowa } from '@/lib/types'
 import { PoleLiczby } from '../PoleLiczby'
+import { PoleWyboru } from '../PoleWyboru'
+
+const DOSTAWCY = [
+  { wartosc: 'bioerg', etykieta: 'Bioerg' },
+  { wartosc: 'synthos', etykieta: 'Synthos' },
+]
 
 interface Props {
   materialy: PozycjaMaterialowa[]
@@ -31,8 +37,8 @@ export function TabelaMaterialow({ materialy, ustaw, podpowiedzi, edycja }: Prop
     }
   }
 
-  const sumaZakupu = materialy.filter((m) => m.dostawca === 'bioerg').reduce((s, m) => s + m.wartosc_zakupu, 0)
-  const sumaNarzut = materialy.filter((m) => m.dostawca === 'bioerg').reduce((s, m) => s + wartoscMaterialu(m), 0)
+  const sumaZakupu = materialy.filter((m) => !czySynthos(m.dostawca)).reduce((s, m) => s + m.wartosc_zakupu, 0)
+  const sumaNarzut = materialy.filter((m) => !czySynthos(m.dostawca)).reduce((s, m) => s + wartoscMaterialu(m), 0)
 
   return (
     <div className="space-y-2">
@@ -47,7 +53,7 @@ export function TabelaMaterialow({ materialy, ustaw, podpowiedzi, edycja }: Prop
               <th className="komorka-naglowek w-20 text-right">Ilość</th>
               <th className="komorka-naglowek w-16">JM</th>
               <th className="komorka-naglowek w-28 text-right">Wartość zakupu [zł]</th>
-              <th className="komorka-naglowek w-28">Dostarczył</th>
+              <th className="komorka-naglowek w-36">Dostarczył</th>
               <th className="komorka-naglowek w-20 text-right">Narzut %</th>
               <th className="komorka-naglowek w-28 text-right">Cena jedn. + narzut</th>
               <th className="komorka-naglowek w-28 text-right">Wartość + narzut</th>
@@ -57,7 +63,7 @@ export function TabelaMaterialow({ materialy, ustaw, podpowiedzi, edycja }: Prop
           </thead>
           <tbody>
             {materialy.map((m, i) => {
-              const synthos = m.dostawca === 'synthos'
+              const synthos = czySynthos(m.dostawca)
               return (
                 <tr key={m.klucz} className={synthos ? 'bg-slate-50 text-slate-500' : undefined}>
                   <td className="komorka p-0">
@@ -77,14 +83,13 @@ export function TabelaMaterialow({ materialy, ustaw, podpowiedzi, edycja }: Prop
                       zmien={(n) => zmien(m, { wartosc_zakupu: n })} />
                   </td>
                   <td className="komorka p-0">
-                    <select className="pole-komorki" disabled={!edycja} value={m.dostawca} aria-label="Dostarczył"
-                      onChange={(e) => {
-                        const d = e.target.value as PozycjaMaterialowa['dostawca']
-                        zmien(m, { dostawca: d, narzut_proc: d === 'synthos' ? 0 : 15 })
-                      }}>
-                      <option value="bioerg">Bioerg</option>
-                      <option value="synthos">Synthos</option>
-                    </select>
+                    <PoleWyboru wKomorce disabled={!edycja} aria-label="Dostarczył" opcje={DOSTAWCY} wartosc={m.dostawca}
+                      placeholderInne="kto dostarczył?"
+                      zmien={(d) => zmien(m, {
+                        dostawca: d,
+                        // Synthos zawsze bez narzutu; po zmianie z Synthosa na innego wraca domyślne 15%.
+                        narzut_proc: czySynthos(d) ? 0 : czySynthos(m.dostawca) ? 15 : m.narzut_proc,
+                      })} />
                   </td>
                   <td className="komorka p-0">
                     <PoleLiczby wartosc={m.narzut_proc} disabled={!edycja || synthos} aria-label="Narzut"
@@ -114,7 +119,7 @@ export function TabelaMaterialow({ materialy, ustaw, podpowiedzi, edycja }: Prop
           {materialy.length > 0 && (
             <tfoot>
               <tr className="font-medium">
-                <td className="komorka text-right" colSpan={3}>Razem (materiał Bioerg)</td>
+                <td className="komorka text-right" colSpan={3}>Razem (bez materiału Synthos)</td>
                 <td className="komorka liczba">{zl(sumaZakupu)}</td>
                 <td className="komorka" colSpan={3} />
                 <td className="komorka liczba">{zl(sumaNarzut)}</td>
@@ -131,6 +136,7 @@ export function TabelaMaterialow({ materialy, ustaw, podpowiedzi, edycja }: Prop
       )}
       <p className="text-xs text-slate-500">
         Materiał dostarczony przez Synthos jest ewidencjonowany (np. na karcie remontowej), ale bez narzutu i bez wartości w eksporcie do SAP.
+        Inny dostawca (np. „z demontażu”, „magazyn P07”) - wybierz „inne (wpisz)” i ustaw narzut ręcznie.
       </p>
     </div>
   )
