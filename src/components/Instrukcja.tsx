@@ -24,7 +24,12 @@ export function Instrukcja({ profil }: { profil: Profil }) {
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
         <h2 className="text-lg font-semibold">Instrukcja</h2>
-        <p className="text-sm text-slate-500">Jak rozliczyć pracę dla Synthos od karty kierownika do wpisu w SAP.</p>
+        <p className="text-sm text-slate-500">
+          Jak rozliczyć pracę dla Synthos od karty kierownika do wpisu w SAP. Publiczna wersja do wysłania innym (bez logowania):{' '}
+          <a className="text-blekit-ciemny underline" href={`${import.meta.env.BASE_URL}instrukcja.html`} target="_blank" rel="noopener">
+            {`${window.location.origin}${import.meta.env.BASE_URL}instrukcja.html`}
+          </a>
+        </p>
       </div>
 
       <section className="sekcja space-y-3">

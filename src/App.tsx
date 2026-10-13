@@ -13,6 +13,7 @@ import { BrakiGodzin } from './components/BrakiGodzin'
 import { Cennik } from './components/Cennik'
 import { Uzytkownicy } from './components/Uzytkownicy'
 import { Instrukcja } from './components/Instrukcja'
+import { NowaWersja } from './components/NowaWersja'
 import { Button } from './components/ui/button'
 
 type Widok = 'zlecenia' | 'eksport' | 'braki' | 'cennik' | 'uzytkownicy' | 'instrukcja'
@@ -121,6 +122,7 @@ function Aplikacja({ profil, zmienHaslo }: { profil: Profil; zmienHaslo: () => v
 
   return (
     <div className="min-h-screen">
+      <NowaWersja />
       <header className="bez-druku border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-4 py-3">
           <div className="flex items-center gap-3">

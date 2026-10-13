@@ -30,6 +30,8 @@ export function Uzytkownicy({ profil }: { profil: Profil }) {
   const [nowy, setNowy] = useState({ email: '', imie_nazwisko: '', rola: 'kierownik' as Rola, mpk: [] as string[] })
   const [hasloDoPrzekazania, setHasloDoPrzekazania] = useState<{ email: string; haslo: string } | null>(null)
   const [blad, setBlad] = useState<string | null>(null)
+  const [komunikat, setKomunikat] = useState<string | null>(null)
+  const [doZmianyRoli, setDoZmianyRoli] = useState<WierszUzytkownika | null>(null)
   const [zajety, setZajety] = useState(false)
 
   const wczytaj = useCallback(async () => {
@@ -92,8 +94,13 @@ export function Uzytkownicy({ profil }: { profil: Profil }) {
 
   async function zmienRole(u: WierszUzytkownika, rola: Rola) {
     setBlad(null)
+    setKomunikat(null)
+    setZajety(true)
     const { error } = await supabase.rpc('zmien_role', { p_user: u.id, p_rola: rola })
+    setZajety(false)
+    setDoZmianyRoli(null)
     if (error) setBlad(komunikatPL(error.message))
+    else setKomunikat(`${u.imie_nazwisko}: rola zmieniona na „${rola === 'handlowiec' ? 'dział handlowy' : 'kierownik'}”. Zmiana działa od następnego odświeżenia strony u tej osoby.`)
     await wczytaj()
   }
 
@@ -110,6 +117,7 @@ export function Uzytkownicy({ profil }: { profil: Profil }) {
     <div className="space-y-5">
       <h2 className="text-lg font-semibold">Użytkownicy</h2>
       {blad && <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">{blad}</div>}
+      {komunikat && <div className="rounded-md bg-limonka-jasna px-4 py-3 text-sm text-limonka-ciemna">{komunikat}</div>}
 
       <form onSubmit={dodaj} className="sekcja">
         <h3 className="text-sm font-semibold">Dodaj użytkownika</h3>
@@ -179,11 +187,11 @@ export function Uzytkownicy({ profil }: { profil: Profil }) {
                       <ShieldCheck className="h-3 w-3" /> administrator
                     </span>
                   ) : u.id === profil.id ? 'dział handlowy' : (
-                    <select className="pole w-auto py-1 text-sm" value={u.rola} aria-label="Rola"
-                      onChange={(e) => void zmienRole(u, e.target.value as Rola)}>
-                      <option value="kierownik">kierownik</option>
-                      <option value="handlowiec">dział handlowy</option>
-                    </select>
+                    <div className="flex items-center gap-2">
+                      <span>{u.rola === 'handlowiec' ? 'dział handlowy' : 'kierownik'}</span>
+                      <button className="rounded px-2 py-0.5 text-xs text-blekit-ciemny ring-1 ring-blekit hover:bg-blekit-jasny"
+                        onClick={() => setDoZmianyRoli(u)}>Zmień rolę</button>
+                    </div>
                   )}
                 </td>
                 <td className="komorka">
@@ -232,6 +240,27 @@ export function Uzytkownicy({ profil }: { profil: Profil }) {
           </div>
           <div className="mt-4 flex justify-end">
             <Button wariant="glowny" onClick={() => setHasloDoPrzekazania(null)}>Zapisałem, zamknij</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!doZmianyRoli} onOpenChange={(o) => !o && setDoZmianyRoli(null)}>
+        <DialogContent>
+          <DialogTitle>Zmiana roli: {doZmianyRoli?.imie_nazwisko}</DialogTitle>
+          <DialogDescription>
+            Obecnie: <strong>{doZmianyRoli?.rola === 'handlowiec' ? 'dział handlowy' : 'kierownik'}</strong>.
+            Dział handlowy widzi wszystkie zlecenia, eksportuje do SAP i zarządza kontami. Kierownik widzi tylko zlecenia swoich MPK.
+          </DialogDescription>
+          <div className="mt-4 grid gap-2">
+            <Button wariant={doZmianyRoli?.rola === 'handlowiec' ? 'zwykly' : 'glowny'} disabled={zajety || doZmianyRoli?.rola === 'handlowiec'}
+              onClick={() => doZmianyRoli && void zmienRole(doZmianyRoli, 'handlowiec')}>
+              Ustaw: dział handlowy
+            </Button>
+            <Button wariant={doZmianyRoli?.rola === 'kierownik' ? 'zwykly' : 'glowny'} disabled={zajety || doZmianyRoli?.rola === 'kierownik'}
+              onClick={() => doZmianyRoli && void zmienRole(doZmianyRoli, 'kierownik')}>
+              Ustaw: kierownik (pamiętaj przypisać MPK)
+            </Button>
+            <Button onClick={() => setDoZmianyRoli(null)}>Anuluj</Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" type="image/png" href="./favicon.png">
+<title>Instrukcja rozliczeń SAP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: jedna kolumna dokumentu (~70 znaków), dwie role jako sekcje z kotwicami, przebieg pracy jako 3 kroki */
+:root {
+  --bg: #f7f9f3;
+  --surface: #ffffff;
+  --fg: #1d2418;
+  --muted: #5b6655;
+  --line: #dde3d4;
+  --limonka: #c4e82a;
+  --limonka-ink: #5f7a06;
+  --limonka-soft: #eef9c4;
+  --blekit: #1b86b4;
+  --blekit-soft: #dff3fb;
+  --amber-soft: #fff6dc;
+  --amber-ink: #7a5200;
+  --display: "Archivo", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141912; --surface: #1c2219; --fg: #e8eee0; --muted: #a3ad99; --line: #2f3829;
+    --limonka: #c4e82a; --limonka-ink: #d4f05a; --limonka-soft: #2b3510; --blekit: #6cc8ee; --blekit-soft: #15303c;
+    --amber-soft: #352a0f; --amber-ink: #f3c96b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141912; --surface: #1c2219; --fg: #e8eee0; --muted: #a3ad99; --line: #2f3829;
+  --limonka: #c4e82a; --limonka-ink: #d4f05a; --limonka-soft: #2b3510; --blekit: #6cc8ee; --blekit-soft: #15303c;
+  --amber-soft: #352a0f; --amber-ink: #f3c96b; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 400 17px/1.6 var(--body); }
+.wrap { max-width: 46rem; margin: 0 auto; padding-inline: 20px; padding-block: 40px 72px; display: grid; gap: 40px; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.2; text-wrap: balance; margin: 0; }
+h1 { font-size: 2.1rem; letter-spacing: -0.01em; }
+h2 { font-size: 1.45rem; }
+h3 { font-size: 1.08rem; }
+p { margin: 0; }
+.eyebrow { font: 600 0.78rem/1 var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--limonka-ink); }
+header { display: grid; gap: 14px; border-bottom: 3px solid var(--limonka); padding-bottom: 24px; }
+.lead { color: var(--muted); font-size: 1.08rem; }
+.adres { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+.adres code { font: 500 0.92rem var(--mono); word-break: break-all; min-width: 0; flex: 1; }
+.adres a { color: var(--blekit); font-weight: 600; }
+button.kopiuj { font: 600 0.85rem var(--body); background: var(--limonka); color: #1d2418; border: 0; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button.kopiuj:focus-visible, a:focus-visible { outline: 2px solid var(--blekit); outline-offset: 2px; }
+nav.role { display: flex; flex-wrap: wrap; gap: 8px; }
+nav.role a { text-decoration: none; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-weight: 600; font-size: 0.95rem; }
+nav.role a:hover { border-color: var(--limonka-ink); }
+section { display: grid; gap: 16px; }
+.przebieg { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 12px; }
+.przebieg li { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 6px; align-content: start; }
+.przebieg .kto { font: 600 0.78rem var(--body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.przebieg .nr { font: 700 1.6rem/1 var(--display); color: var(--limonka-ink); }
+.kroki { margin: 0; padding: 0; list-style: none; counter-reset: k; display: grid; gap: 18px; }
+.kroki > li { counter-increment: k; display: grid; grid-template-columns: 2rem 1fr; gap: 4px 12px; }
+.kroki > li::before { content: counter(k); grid-row: span 2; width: 2rem; height: 2rem; border-radius: 50%; background: var(--limonka); color: #1d2418; font: 700 0.95rem/2rem var(--display); text-align: center; }
+.kroki > li > div { display: grid; gap: 6px; min-width: 0; }
+.rola { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 24px 22px; display: grid; gap: 20px; }
+.rola header { border-bottom: 1px solid var(--line); padding-bottom: 16px; gap: 6px; }
+.uwaga { background: var(--amber-soft); color: var(--amber-ink); border-radius: 8px; padding: 12px 14px; font-size: 0.97rem; }
+.info { background: var(--blekit-soft); border-radius: 8px; padding: 12px 14px; font-size: 0.97rem; }
+.btn { display: inline-block; font: 600 0.88rem/1.3 var(--body); background: var(--limonka-soft); color: var(--fg); border: 1px solid var(--limonka-ink); border-radius: 5px; padding: 0 6px; white-space: nowrap; }
+.test { margin: 0; padding-left: 1.2rem; display: grid; gap: 6px; }
+dl { margin: 0; display: grid; grid-template-columns: minmax(9rem, max-content) 1fr; gap: 8px 16px; }
+dt { font-weight: 600; }
+dd { margin: 0; color: var(--muted); min-width: 0; }
+@media (max-width: 560px) { dl { grid-template-columns: 1fr; gap: 2px; } dd { margin-bottom: 8px; } h1 { font-size: 1.7rem; } .rola { padding: 18px 16px; } }
+footer { color: var(--muted); font-size: 0.9rem; border-top: 1px solid var(--line); padding-top: 16px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+html { scroll-behavior: smooth; }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Bioerg · prace dla Synthos</span>
+    <h1>Rozliczenia prac w aplikacji zamiast w Excelu</h1>
+    <p class="lead">Kierownik wpisuje zlecenie po remoncie, dział handlowy jednym kliknięciem dostaje gotowe linie do wklejenia w SAP. Ceny i indeksy SAP pochodzą z cennika kontraktowego, więc nikt ich nie przepisuje.</p>
+    <div class="adres">
+      <code id="adres">https://aitaxconsultinglu.github.io/bioergrozliczenieSAP/</code>
+      <button class="kopiuj" id="kopiuj-adres" type="button">Kopiuj adres</button>
+      <a href="https://aitaxconsultinglu.github.io/bioergrozliczenieSAP/" target="_blank" rel="noopener">Otwórz</a>
+    </div>
+    <nav class="role" aria-label="Części instrukcji">
+      <a href="#przebieg">Jak to działa</a>
+      <a href="#kierownik">Kierownik wydziału</a>
+      <a href="#handlowy">Dział handlowy</a>
+      <a href="#logowanie">Pierwsze logowanie</a>
+      <a href="#slowniczek">Słowniczek</a>
+    </nav>
+  </header>
+
+  <section id="przebieg" aria-labelledby="h-przebieg">
+    <h2 id="h-przebieg">Jak to działa</h2>
+    <ol class="przebieg">
+      <li><span class="nr">1</span><span class="kto">Kierownik wydziału</span><p>Po remoncie wpisuje zlecenie: numer zamówienia SAP, pozycje z cennika, godziny, materiały i karty remontowe. Klika <span class="btn">Złóż do rozliczenia</span>.</p></li>
+      <li><span class="nr">2</span><span class="kto">Dział handlowy</span><p>Widzi złożone zlecenia, sprawdza je i kopiuje gotowe linie w układzie SAP albo pobiera plik XLSX.</p></li>
+      <li><span class="nr">3</span><span class="kto">SAP Synthos</span><p>Dział handlowy wkleja linie w rozliczenie zamówienia i oznacza zlecenie w aplikacji jako wyeksportowane.</p></li>
+    </ol>
+    <p>Gdy coś się nie zgadza, dział handlowy zwraca zlecenie do poprawki z komentarzem. Kierownik poprawia i składa ponownie. Wszystkie zmiany zapisują się w historii zlecenia.</p>
+    <p class="info">W aplikacji są przykładowe zlecenia odtworzone z dotychczasowego Excela (uszczelki bez karty i remont pompy z kartą). Można na nich przećwiczyć cały obieg.</p>
+  </section>
+
+  <article class="rola" id="kierownik" aria-labelledby="h-kierownik">
+    <header>
+      <span class="eyebrow">Kierownicy wydziałów (MPK)</span>
+      <h2 id="h-kierownik">Kierownik wydziału: wpisanie zlecenia</h2>
+      <p class="lead">To, co dotąd było zakładką w Excelu, jest teraz jednym zleceniem w aplikacji.</p>
+    </header>
+    <ol class="kroki">
+      <li><h3>Nowe zlecenie</h3><div><p>„Moje zlecenia” → <span class="btn">Nowe zlecenie</span>. Przy kolejnym remoncie tego samego typu otwórz poprzednie zlecenie i kliknij <span class="btn">Kopiuj jako nowe</span>. Nagłówek i pozycje się przepiszą, a numer zamówienia, materiały i karty wpisujesz na nowo.</p></div></li>
+      <li><h3>Dane zlecenia</h3><div><p><strong>Nazwa</strong>, np. „POMPA 3X9K NR 422”. <strong>Nr zamówienia SAP</strong> z FIORI (aplikacja podpowiada numery wpisane wcześniej). <strong>Pozycja zamówienia</strong>: końcówka -10 / -20, jeśli jest. <strong>Konto</strong>, np. URR/1/2026/BZ, <strong>mechanik</strong> i daty.</p><p><strong>Rodzaj karty</strong>: pompa / urządzenie, silnik elektryczny albo „inne” dla nietypowej pracy.</p><p><strong>Nr linii zam.</strong> (usługi / materiały): numery linii nadaje Synthos w zamówieniu, często 10 i 20. Przepisz je z zamówienia albo zostaw puste, a dział handlowy uzupełni je w SAP.</p></div></li>
+      <li><h3>Robocizna wg cennika</h3><div><p>Wpisz w wyszukiwarkę fragment nazwy z umowy, np. „3x9k”, „siln 7,5 1400” albo „uszczelek”, i kliknij pozycję. Ilość to liczba sztuk. Cena podstawia się sama.</p><p>Przy silniku w kolumnie „Dopłata” wybierz „Przezwojenie +10%”, a każdą inną dopłatę wpisz przez „inna (wpisz)”. Pod pozycją możesz dopisać uwagi, np. wykaz uszczelek.</p><p>Kolumna <strong>„Karta”</strong> zaznacza się sama przy pompach, przekładniach i silnikach. Odznacz ją, jeśli w tym zleceniu karta nie jest potrzebna.</p><p>Pracy nie ma w cenniku? Kliknij <span class="btn">Pozycja spoza cennika</span> i wpisz opis oraz cenę ręcznie.</p></div></li>
+      <li><h3>Robocizna wg rbg</h3><div><p>Wpisz godziny w kratce <strong>stanowisko × pora dnia</strong> (7–15, 15–19, 19–7, dni wolne). Stawka bierze się z cennika. Godziny ludzi z innego MPK dodaj w części „Kooperacja z innym MPK”, zamiast dopisku typu „20 RBG DLA SPORYSZ”.</p></div></li>
+      <li><h3>Materiały</h3><div><p>Zacznij pisać nazwę, np. „łożysko 6308”. Aplikacja pokaże <strong>5 ostatnich zakupów</strong> z datą, numerem faktury i ceną. Kliknij cenę, a wstawią się nazwa, cena i numer faktury.</p><p>Możesz też wpisać cenę za jednostkę albo łączną wartość z faktury, a drugie pole policzy się samo. <strong>Narzut 12%</strong> i wartość z narzutem są w osobnych kolumnach.</p><p><strong>Dostarczył</strong>: Bioerg, Synthos (narzut 0%, nie idzie do rozliczenia) albo „inne (wpisz)”, np. „z demontażu”, z narzutem ustawionym ręcznie.</p></div></li>
+      <li><h3>Karty remontowe</h3><div><p>Pompy, przekładnie i silniki z umowy wymagają karty, jednej na każdą sztukę. Aplikacja pokazuje, ile kart brakuje. Przycisk <span class="btn">Dodaj brakujące karty</span> tworzy je z podpowiedzianym numerem KR. Pola z czerwoną gwiazdką są obowiązkowe. Czynności spoza listy wpisujesz w polu „Inne czynności”.</p><p>Przycisk <span class="btn">PDF</span> pobiera kartę jako plik do załączenia w Synthosie.</p></div></li>
+      <li><h3>Braki godzin</h3><div><p>Jeśli w zamówieniu zabrakło godzin, kliknij „+ Zgłoś brak godzin”. Dział handlowy będzie pilnował uzupełnienia.</p></div></li>
+      <li><h3>Zapisz i złóż</h3><div><p><span class="btn">Zapisz</span> klikaj w każdej chwili, nawet z niepełnymi danymi. Na koniec <span class="btn">Złóż do rozliczenia</span>. Aplikacja nie przepuści zlecenia bez numeru zamówienia i bez kompletnych kart, a po złożeniu je blokuje. Zwrot od działu handlowego zobaczysz jako żółty komunikat z opisem, co poprawić.</p></div></li>
+    </ol>
+    <div class="uwaga"><strong>Do przetestowania:</strong>
+      <ol class="test">
+        <li>Otwórz przykładowe zlecenie remontu pompy i kliknij „Kopiuj jako nowe”.</li>
+        <li>Wpisz dowolny numer zamówienia, zmień ilość pomp na 2 i spróbuj złożyć. Aplikacja powinna zażądać drugiej karty.</li>
+        <li>Dodaj kartę, materiał od Synthosu i jedną pozycję spoza cennika, a potem złóż.</li>
+        <li>Zapisz uwagi: czego brakuje na karcie remontowej w porównaniu z papierową.</li>
+      </ol>
+    </div>
+  </article>
+
+  <article class="rola" id="handlowy" aria-labelledby="h-handlowy">
+    <header>
+      <span class="eyebrow">Dział handlowo-logistyczny</span>
+      <h2 id="h-handlowy">Dział handlowy: wprowadzenie do SAP</h2>
+      <p class="lead">Zamiast przepisywać karty, kopiujesz gotowe linie w układzie importu SAP.</p>
+    </header>
+    <ol class="kroki">
+      <li><h3>Zakładka „Eksport do SAP”</h3><div><p>Lista zleceń złożonych przez kierowników. Strzałka przy zleceniu pokazuje linie, które trafią do SAP: Numer linii, Numer usługi, Krótki tekst, Ilość, Pozostało, Podst. t.JM, Cena, Wartość, Cena Mat., Ilość Mat., Nr Mat. dostawcy. Żółte oznaczenie „pozycja spoza cennika” oznacza, że trzeba sprawdzić opis, cenę i indeks. Szare „bez nr linii”: numer linii zamówienia uzupełnij w SAP.</p></div></li>
+      <li><h3>Wklejenie do SAP</h3><div><p><span class="btn">Kopiuj</span> przy zleceniu kopiuje jego linie do schowka. W SAP otwórz rozliczenie tego zamówienia i wklej (Ctrl+V). Albo zaznacz kilka zleceń i kliknij <span class="btn">Pobierz XLSX</span>: plik ma zestawienie i osobny arkusz dla każdego zamówienia.</p></div></li>
+      <li><h3>Oznacz jako wyeksportowane</h3><div><p>Po wprowadzeniu do SAP zaznacz zlecenia i kliknij <span class="btn">Oznacz jako wyeksportowane</span>. Znikną z listy i zostaną zablokowane, więc nic nie trafi do SAP dwa razy. Pomyłkę cofniesz w samym zleceniu przyciskiem „Cofnij eksport”.</p></div></li>
+      <li><h3>PDF kart remontowych</h3><div><p>W zleceniu, w sekcji „Karty remontowe”, przycisk <span class="btn">PDF</span> przy karcie albo „PDF wszystkich kart” pobiera plik do załączenia do arkusza rozliczeniowego w Synthosie.</p></div></li>
+      <li><h3>Poprawki</h3><div><p>Drobny błąd popraw sama w zleceniu i kliknij „Zapisz”. Jeśli poprawić musi kierownik, kliknij <span class="btn">Zwróć do poprawki</span> i napisz, co nie gra.</p></div></li>
+      <li><h3>Braki godzin, cennik, użytkownicy</h3><div><p><strong>Braki godzin</strong>: wszystkie zgłoszone braki z podsumowaniem na MPK. Status zmieniasz: zgłoszony → uzupełniony przez klienta → rozliczony. <strong>Cennik</strong>: podgląd umowy, domyślny narzut na materiał (12%) i ustawienie, które kategorie domyślnie wymagają karty. <strong>Użytkownicy</strong>: zakładanie kont, zmiana roli, przypisywanie MPK, reset hasła.</p></div></li>
+    </ol>
+    <div class="uwaga"><strong>Do sprawdzenia na przykładach:</strong> skopiuj linie przykładowego zlecenia pompy i porównaj z tym, co wklejasz do SAP. Odpowiedz na trzy pytania:
+      <ol class="test">
+        <li>Czy materiał wpisujesz osobnymi liniami, czy jedną zbiorczą linią „Materiał +12%”? Od tego zależy różnica rzędu groszy w zaokrągleniach.</li>
+        <li>Co wpisujesz w kolumnach „Pozostało”, „Cena Mat.”, „Ilość Mat.” i „Nr Mat. dostawcy”?</li>
+        <li>Czy PDF karty wygląda jak wzór, który załączasz w Synthosie? Prześlij wzór, a dopasujemy układ.</li>
+      </ol>
+    </div>
+  </article>
+
+  <section id="logowanie" aria-labelledby="h-logowanie">
+    <h2 id="h-logowanie">Pierwsze logowanie</h2>
+    <ol class="kroki">
+      <li><h3>Otwórz adres aplikacji</h3><div><p>Najlepiej w Chrome lub Edge. Adres jest na górze tej strony.</p></div></li>
+      <li><h3>Zaloguj się</h3><div><p>Login to służbowy e-mail, hasło tymczasowe dostajesz od administratora.</p></div></li>
+      <li><h3>Ustaw własne hasło</h3><div><p>Aplikacja od razu o nie poprosi: co najmniej 6 znaków, w tym jeden znak specjalny. Zapomniane hasło administrator resetuje w kilka sekund.</p></div></li>
+    </ol>
+    <p>W samej aplikacji jest też zakładka <span class="btn">Instrukcja</span> z tymi samymi krokami.</p>
+  </section>
+
+  <section id="slowniczek" aria-labelledby="h-slowniczek">
+    <h2 id="h-slowniczek">Słowniczek</h2>
+    <dl>
+      <dt>Zlecenie</dt><dd>Jedno rozliczenie, czyli dawna zakładka w Excelu. Zwykle odpowiada jednej pozycji zamówienia SAP.</dd>
+      <dt>Nr zamówienia SAP</dt><dd>Numer 4200… nadany przez Synthos. Nie da się go pobrać automatycznie, więc wpisuje go kierownik.</dd>
+      <dt>Pozycja z cennika</dt><dd>Praca wyceniona w umowie, np. remont pompy danego typu. Ma stały indeks SAP (Numer usługi).</dd>
+      <dt>Rbg</dt><dd>Roboczogodzina. Stawka zależy od stanowiska i pory dnia.</dd>
+      <dt>Materiał +15%</dt><dd>Materiał kupiony przez Bioerg, rozliczany pod indeksem 5004062 z narzutem (obecnie 12%). Materiał od Synthosu ma 0%.</dd>
+      <dt>Karta remontowa</dt><dd>Obowiązkowa przy pompach, przekładniach i silnikach z umowy, jedna na sztukę.</dd>
+      <dt>MPK</dt><dd>Wydział P03–P09. Kierownik widzi tylko zlecenia swoich MPK.</dd>
+      <dt>Wsad do SAP</dt><dd>Linie w układzie kolumn importu SAP, kopiowane do schowka albo pobierane jako XLSX.</dd>
+    </dl>
+  </section>
+
+  <footer>Bioerg Sp. z o.o. · aplikacja w fazie testów. Uwagi i błędy zgłaszaj administratorowi. · <a href="./">Przejdź do logowania</a></footer>
+</div>
+
+<script>
+document.getElementById('kopiuj-adres').addEventListener('click', function () {
+  var btn = this, tekst = document.getElementById('adres').textContent;
+  navigator.clipboard.writeText(tekst).then(function () {
+    btn.textContent = 'Skopiowano';
+    setTimeout(function () { btn.textContent = 'Kopiuj adres'; }, 1800);
+  }).catch(function () {
+    var r = document.createRange(); r.selectNodeContents(document.getElementById('adres'));
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+    btn.textContent = 'Zaznaczono - Ctrl+C';
+  });
+});
+</script>
+
+</body>
+</html>

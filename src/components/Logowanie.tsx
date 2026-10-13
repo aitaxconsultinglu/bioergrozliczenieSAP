@@ -113,6 +113,9 @@ export function Logowanie() {
 
         <p className="mt-6 border-t border-slate-100 pt-4 text-center text-xs text-slate-500">
           Konta zakłada dział handlowy. Jeśli nie masz jeszcze dostępu, zgłoś się tam.
+          <a href={`${import.meta.env.BASE_URL}instrukcja.html`} target="_blank" rel="noopener" className="mt-2 block text-blekit-ciemny underline">
+            Jak działa aplikacja? Instrukcja
+          </a>
         </p>
       </form>
     </div>
