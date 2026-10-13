@@ -90,6 +90,13 @@ export function Uzytkownicy({ profil }: { profil: Profil }) {
     await wczytaj()
   }
 
+  async function zmienRole(u: WierszUzytkownika, rola: Rola) {
+    setBlad(null)
+    const { error } = await supabase.rpc('zmien_role', { p_user: u.id, p_rola: rola })
+    if (error) setBlad(komunikatPL(error.message))
+    await wczytaj()
+  }
+
   async function przelaczMpk(u: WierszUzytkownika, kod: string) {
     setBlad(null)
     const { error } = u.mpk.includes(kod)
@@ -171,7 +178,13 @@ export function Uzytkownicy({ profil }: { profil: Profil }) {
                       className="inline-flex items-center gap-1 rounded-full bg-limonka-jasna px-2.5 py-0.5 text-xs font-medium text-limonka-ciemna ring-1 ring-limonka">
                       <ShieldCheck className="h-3 w-3" /> administrator
                     </span>
-                  ) : u.rola === 'handlowiec' ? 'dział handlowy' : 'kierownik'}
+                  ) : u.id === profil.id ? 'dział handlowy' : (
+                    <select className="pole w-auto py-1 text-sm" value={u.rola} aria-label="Rola"
+                      onChange={(e) => void zmienRole(u, e.target.value as Rola)}>
+                      <option value="kierownik">kierownik</option>
+                      <option value="handlowiec">dział handlowy</option>
+                    </select>
+                  )}
                 </td>
                 <td className="komorka">
                   {u.rola === 'handlowiec' ? <span className="text-sm text-slate-500">wszystkie</span> : (

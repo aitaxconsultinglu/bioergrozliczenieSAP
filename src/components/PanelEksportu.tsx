@@ -12,8 +12,8 @@ import { cn } from '@/lib/utils'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
 
-const ZAPYTANIE = `id, mpk, nr_zamowienia, pozycja_zamowienia, nazwa, mechanik, zlozono,
-  pozycje_uslug(ilosc, cena, doplata_proc, kolejnosc, wlasny_opis, wlasna_jm, wlasny_indeks, cennik_pozycje(*)),
+const ZAPYTANIE = `id, mpk, nr_zamowienia, pozycja_zamowienia, nazwa, mechanik, zlozono, linia_uslugi, linia_materialy,
+  pozycje_uslug(ilosc, cena, doplata_proc, kolejnosc, wlasny_opis, wlasna_jm, wlasny_indeks, nr_linii_sap, cennik_pozycje(*)),
   pozycje_materialowe(nazwa, ilosc, wartosc_zakupu, narzut_proc, dostawca, kolejnosc)`
 
 type ZlecenieZPanelu = ZlecenieDoEksportu & { mechanik: string | null; zlozono: string | null }
@@ -173,6 +173,12 @@ export function PanelEksportu({ otworz }: { otworz: (id: string) => void }) {
                         <span className="ml-2 rounded bg-amber-50 px-1.5 text-xs text-amber-800 ring-1 ring-amber-300"
                           title="Kierownik dodał pozycję spoza cennika - sprawdź opis, cenę i indeks SAP przed wklejeniem">
                           pozycja spoza cennika
+                        </span>
+                      )}
+                      {wiersze.some((w) => w[0] === null) && (
+                        <span className="ml-2 rounded bg-slate-100 px-1.5 text-xs text-slate-600 ring-1 ring-slate-300"
+                          title="Kierownik nie wpisał numeru linii zamówienia - uzupełnij go w SAP po wklejeniu albo dopisz w zleceniu">
+                          bez nr linii
                         </span>
                       )}
                     </td>

@@ -54,6 +54,8 @@ export interface Zlecenie {
   data_przyjecia: string | null
   data_zakonczenia: string | null
   status: StatusZlecenia
+  linia_uslugi: number | null
+  linia_materialy: number | null
   uwagi: string | null
   komentarz_handlowca: string | null
   utworzono: string
@@ -74,6 +76,10 @@ export interface PozycjaUslugi {
   wlasna_jm?: string | null
   wlasna_cena?: number | null
   wlasny_indeks?: string | null
+  /** null/undefined = jak w kategorii cennika; false = karta niepotrzebna mimo kategorii */
+  wymaga_karty?: boolean | null
+  /** Nr linii zamówienia SAP dla tej pozycji (nadaje Synthos); pusty = nr linii zlecenia */
+  nr_linii_sap?: number | null
   doplata_proc: number
   doplata_opis: string | null
   mpk_wykonawcy: string | null

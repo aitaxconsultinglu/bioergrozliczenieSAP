@@ -69,12 +69,15 @@ export function Instrukcja({ profil }: { profil: Profil }) {
               <strong> Pozycja zamówienia</strong>: końcówka typu -10 / -20, jeśli zamówienie ma kilka pozycji.
               <strong> Konto</strong> (np. URR/1/2026/BZ), <strong>Mechanik</strong>, daty.</p>
             <p><strong>Rodzaj karty</strong>: pompa/urządzenie, silnik elektryczny albo „inne” dla nietypowej pracy.</p>
+            <p><strong>Nr linii zam. - usługi / materiały</strong>: numery linii nadaje Synthos przy tworzeniu zamówienia w SAP (często 10 dla usług i 20 dla materiału). Przepisz je z zamówienia.
+              Jeśli ich nie znasz, zostaw puste - dział handlowy uzupełni je w SAP. Inny numer dla pojedynczej pozycji wpiszesz w kolumnie „Nr linii”.</p>
           </Krok>
           <Krok nr={3} tytul="Robocizna wg cennika">
             <p>Wpisz w wyszukiwarkę fragment nazwy z umowy, np. <em>„3x9k”</em>, <em>„siln 7,5 1400”</em> albo <em>„uszczelek”</em>, i kliknij pozycję.
               <strong> Ilość</strong> to liczba sztuk (5 pomp = 5). Cena podstawia się sama z cennika.</p>
             <p><strong>Dopłata</strong>: przy silniku wybierz „Przezwojenie +10%”, a każdą inną dopłatę wpisz przez „inna (wpisz)”.
               Pod pozycją możesz dopisać uwagi, np. wykaz uszczelek albo numery urządzeń.</p>
+            <p>Kolumna <strong>„Karta”</strong>: zaznaczona, gdy pozycja wymaga karty remontowej. Dla pomp, przekładni i silników zaznacza się sama, ale możesz ją odznaczyć, jeśli w tym zleceniu karta nie jest potrzebna.</p>
             <p>Pracy nie ma w cenniku? Użyj przycisku <strong>„Pozycja spoza cennika”</strong> i wpisz opis oraz cenę ręcznie. Dział handlowy zobaczy ją oznaczoną do sprawdzenia.</p>
           </Krok>
           <Krok nr={4} tytul="Robocizna wg rbg (godziny)">
@@ -82,14 +85,17 @@ export function Instrukcja({ profil }: { profil: Profil }) {
             <p>Godziny przepracowane przez ludzi z innego MPK dodaj w części <strong>„Kooperacja z innym MPK”</strong>. Zastępuje to dopiski typu „20 RBG DLA SPORYSZ”.</p>
           </Krok>
           <Krok nr={5} tytul="Materiały">
-            <p>Jeden wiersz na pozycję z faktury: nazwa, ilość, JM i <strong>łączna wartość zakupu z faktury</strong>, tak jak dotąd w Excelu.
-              Cena z narzutem 15% liczy się sama. Enter w ostatniej kolumnie dodaje nowy wiersz.</p>
-            <p><strong>Dostarczył</strong>: Bioerg (narzut 15%), <strong>Synthos (narzut 0%, nie idzie do rozliczenia)</strong> albo „inne (wpisz)”, np. „z demontażu”. Przy innym dostawcy narzut ustawiasz sam.</p>
+            <p>Zacznij pisać nazwę, np. „łożysko 6308”. Aplikacja pokaże <strong>5 ostatnich zakupów</strong> tego materiału z datą, numerem faktury i ceną.
+              Kliknij cenę, a wstawią się nazwa, cena zakupu i numer faktury.</p>
+            <p>Możesz też wpisać ręcznie <strong>cenę za jednostkę</strong> albo <strong>łączną wartość z faktury</strong>, a drugie pole policzy się samo.
+              Narzut (domyślnie 12%) i wartość z narzutem liczą się automatycznie i są widoczne w osobnych kolumnach. Enter w ostatniej kolumnie dodaje wiersz.</p>
+            <p><strong>Dostarczył</strong>: Bioerg, <strong>Synthos (narzut 0%, nie idzie do rozliczenia)</strong> albo „inne (wpisz)”, np. „z demontażu”. Przy innym dostawcy narzut ustawiasz sam.</p>
           </Krok>
           <Krok nr={6} tytul="Karty remontowe">
             <p>Pompy, przekładnie i silniki z umowy wymagają karty remontowej, <strong>jednej na każdą sztukę</strong>. Aplikacja pokazuje, ile kart brakuje.
               Przycisk <strong>„Dodaj brakujące karty”</strong> tworzy je z podpowiedzianym numerem KR.</p>
             <p>Pola z czerwoną gwiazdką są obowiązkowe. Zakres remontu zaznaczasz na liście, a czynności spoza listy wpisujesz w polu „Inne czynności”.</p>
+            <p>Przycisk <strong>PDF</strong> przy karcie pobiera ją jako plik do załączenia w Synthosie. „PDF wszystkich kart” daje jeden plik z kartami całego zlecenia.</p>
           </Krok>
           <Krok nr={7} tytul="Braki godzin">
             <p>Jeśli zleceniodawca założył w zamówieniu za mało godzin, kliknij „+ Zgłoś brak godzin”. Dział handlowy będzie pilnował uzupełnienia.</p>
@@ -110,7 +116,8 @@ export function Instrukcja({ profil }: { profil: Profil }) {
             <Krok nr={1} tytul="Zakładka „Eksport do SAP”">
               <p>Lista zleceń złożonych przez kierowników. Strzałka przy zleceniu pokazuje dokładnie te linie, które trafią do SAP
                 (Numer linii, Numer usługi, Krótki tekst, Ilość, …). Klik w nazwę otwiera całe zlecenie.</p>
-              <p>Zlecenia z żółtym oznaczeniem <strong>„pozycja spoza cennika”</strong> wymagają sprawdzenia opisu, ceny i indeksu.</p>
+              <p>Zlecenia z żółtym oznaczeniem <strong>„pozycja spoza cennika”</strong> wymagają sprawdzenia opisu, ceny i indeksu.
+                Szare oznaczenie <strong>„bez nr linii”</strong> znaczy, że kierownik nie wpisał numeru linii zamówienia. Uzupełnij go w zleceniu albo w SAP po wklejeniu.</p>
             </Krok>
             <Krok nr={2} tytul="Wklejenie do SAP">
               <p><strong>Kopiuj</strong> przy zleceniu kopiuje jego linie do schowka. W SAP otwórz rozliczenie tego zamówienia i wklej (Ctrl+V).</p>
@@ -125,12 +132,12 @@ export function Instrukcja({ profil }: { profil: Profil }) {
             </Krok>
             <Krok nr={5} tytul="Braki godzin, cennik, użytkownicy">
               <p><strong>Braki godzin</strong>: lista zgłoszonych braków z podsumowaniem na MPK. Zmieniasz w niej status: zgłoszony → uzupełniony przez klienta → rozliczony.</p>
-              <p><strong>Cennik</strong>: podgląd umowy. Wybierz kategorię, aby ustawić, czy wymaga karty remontowej i jakiej.</p>
-              <p><strong>Użytkownicy</strong>: zakładanie kont (hasło tymczasowe pokazuje się raz), przypisywanie MPK kierownikom, reset hasła.</p>
+              <p><strong>Cennik</strong>: podgląd umowy, <strong>domyślny narzut na materiał</strong> (obecnie 12%) i ustawienie, które kategorie domyślnie wymagają karty remontowej.</p>
+              <p><strong>Użytkownicy</strong>: zakładanie kont (hasło tymczasowe pokazuje się raz), zmiana roli (kierownik / dział handlowy), przypisywanie MPK kierownikom, reset hasła.</p>
             </Krok>
           </ol>
           <Uwaga>
-            Układ eksportu jest wstępny: numer linii z cennika, materiał jako pozycja 5004062 z ilością = wartość po 1 zł.
+            Układ eksportu jest wstępny: numer linii z zamówienia (wpisany przez kierownika albo pusty), materiał jako pozycja 5004062 z ilością = wartość z narzutem po 1 zł.
             Sprawdź go na pierwszych zleceniach i zgłoś, czym różni się od tego, co faktycznie wklejasz do SAP. Poprawka jest szybka.
           </Uwaga>
         </section>

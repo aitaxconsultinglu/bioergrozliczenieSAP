@@ -1,4 +1,4 @@
-import { CheckCircle2, CircleAlert, Plus, Trash2 } from 'lucide-react'
+import { CheckCircle2, CircleAlert, FileDown, Plus, Trash2 } from 'lucide-react'
 import { SZABLONY, brakiKarty, szablon, type Pole } from '@/lib/szablony'
 import { nowyKlucz } from '@/lib/obliczenia'
 import type { KartaRemontowa } from '@/lib/types'
@@ -15,6 +15,8 @@ interface Props {
   /** Kolejny wolny numer karty; przesunięcie > 0 przy dodawaniu kilku kart naraz. */
   numerKarty: (przesuniecie: number) => string
   edycja: boolean
+  /** Pobranie PDF wskazanych kart (do załączenia w Synthosie). */
+  pdf: (karty: KartaRemontowa[]) => void
 }
 
 export function nowaKarta(szablonId: string, numer: string, nazwa: string, mechanik: string): KartaRemontowa {
@@ -25,7 +27,7 @@ export function nowaKarta(szablonId: string, numer: string, nazwa: string, mecha
   }
 }
 
-export function KartyRemontowe({ karty, ustaw, wymagane, szablonZlecenia, nazwaZlecenia, mechanik, numerKarty, edycja }: Props) {
+export function KartyRemontowe({ karty, ustaw, wymagane, szablonZlecenia, nazwaZlecenia, mechanik, numerKarty, edycja, pdf }: Props) {
   const brakuje = Math.max(0, wymagane - karty.length)
 
   function dodaj(ile: number) {
@@ -45,7 +47,12 @@ export function KartyRemontowe({ karty, ustaw, wymagane, szablonZlecenia, nazwaZ
       )}>
         {wymagane > 0
           ? <>Pozycje cennikowe tego zlecenia wymagają <strong>{wymagane}</strong> {wymagane === 1 ? 'karty' : 'kart'} remontowych (1 na sztukę). Wypełniono: <strong>{karty.length}</strong>.</>
-          : <>Żadna pozycja tego zlecenia nie wymaga karty remontowej. Kartę można dodać dobrowolnie.</>}
+          : <>Żadna pozycja tego zlecenia nie wymaga karty remontowej (zaznaczenie „Karta” przy pozycji). Kartę można dodać dobrowolnie.</>}
+        {karty.length > 0 && (
+          <button onClick={() => pdf(karty)} className="inline-flex items-center gap-1 rounded bg-white px-3 py-1 text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100">
+            <FileDown className="h-4 w-4" /> PDF {karty.length > 1 ? `wszystkich kart (${karty.length})` : 'karty'}
+          </button>
+        )}
         {edycja && brakuje > 0 && (
           <button onClick={() => dodaj(brakuje)} className="ml-auto rounded bg-amber-500 px-3 py-1 text-white hover:bg-amber-600">
             Dodaj brakujące karty ({brakuje})
@@ -54,7 +61,7 @@ export function KartyRemontowe({ karty, ustaw, wymagane, szablonZlecenia, nazwaZ
       </div>
 
       {karty.map((k, i) => (
-        <Karta key={k.klucz} karta={k} nr={i + 1} edycja={edycja} zmien={(z) => zmien(k, z)}
+        <Karta key={k.klucz} karta={k} nr={i + 1} edycja={edycja} zmien={(z) => zmien(k, z)} pdf={() => pdf([k])}
           usun={() => ustaw(karty.filter((x) => x !== k))} />
       ))}
 
@@ -67,12 +74,13 @@ export function KartyRemontowe({ karty, ustaw, wymagane, szablonZlecenia, nazwaZ
   )
 }
 
-function Karta({ karta, nr, edycja, zmien, usun }: {
+function Karta({ karta, nr, edycja, zmien, usun, pdf }: {
   karta: KartaRemontowa
   nr: number
   edycja: boolean
   zmien: (z: Partial<KartaRemontowa>) => void
   usun: () => void
+  pdf: () => void
 }) {
   const s = szablon(karta.szablon)
   const braki = brakiKarty(karta)
@@ -98,8 +106,11 @@ function Karta({ karta, nr, edycja, zmien, usun }: {
         {braki.length === 0
           ? <span className="inline-flex items-center gap-1 text-xs text-limonka-ciemna"><CheckCircle2 className="h-4 w-4" /> kompletna</span>
           : <span className="inline-flex items-center gap-1 text-xs text-amber-700"><CircleAlert className="h-4 w-4" /> brakuje: {braki.join(', ')}</span>}
+        <button onClick={pdf} className="ml-auto inline-flex items-center gap-1 text-xs text-blekit-ciemny hover:underline" title="Pobierz kartę jako PDF">
+          <FileDown className="h-4 w-4" /> PDF
+        </button>
         {edycja && (
-          <button onClick={usun} className="ml-auto text-slate-400 hover:text-red-600" aria-label="Usuń kartę">
+          <button onClick={usun} className="text-slate-400 hover:text-red-600" aria-label="Usuń kartę">
             <Trash2 className="h-4 w-4" />
           </button>
         )}

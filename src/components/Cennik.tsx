@@ -11,7 +11,8 @@ import type { Profil } from '@/lib/types'
  * karty remontowej i jakiego szablonu - to steruje walidacją bez zmian w kodzie.
  */
 export function Cennik({ profil }: { profil: Profil }) {
-  const { pozycje, kategorie, odswiez } = useSlowniki()
+  const { pozycje, kategorie, odswiez, narzutDomyslny } = useSlowniki()
+  const [narzut, setNarzut] = useState(String(narzutDomyslny))
   const [fraza, setFraza] = useState('')
   const [kategoria, setKategoria] = useState<number | ''>('')
   const [blad, setBlad] = useState<string | null>(null)
@@ -35,6 +36,14 @@ export function Cennik({ profil }: { profil: Profil }) {
 
   const kat = kategoria === '' ? null : kategorie.get(kategoria)
 
+  async function zapiszNarzut(n: number) {
+    if (!Number.isFinite(n) || n < 0 || n > 100) { setBlad('Narzut musi być liczbą od 0 do 100.'); return }
+    const { error } = await supabase.from('ustawienia').update({ wartosc: n }).eq('klucz', 'narzut_material_proc')
+    if (error) { setBlad(komunikatPL(error.message)); return }
+    setBlad(null)
+    await odswiez()
+  }
+
   return (
     <div className="space-y-4">
       <div>
@@ -42,6 +51,20 @@ export function Cennik({ profil }: { profil: Profil }) {
         <p className="text-sm text-slate-500">{pozycje.length} pozycji w {kategorie.size} kategoriach. Ceny i indeksy SAP są źródłem prawdy dla wszystkich rozliczeń.</p>
       </div>
       {blad && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{blad}</p>}
+
+      <div className="sekcja flex flex-wrap items-center gap-3 text-sm">
+        <span>Domyślny narzut na materiał kupiony przez Bioerg:</span>
+        {handlowiec ? (
+          <>
+            <input className="pole w-20 text-right" inputMode="decimal" value={narzut} aria-label="Domyślny narzut %"
+              onChange={(e) => setNarzut(e.target.value)} />
+            <span>%</span>
+            <button className="rounded-md bg-limonka px-3 py-1.5 font-medium hover:bg-limonka-ciemna hover:text-white"
+              onClick={() => void zapiszNarzut(Number(narzut.replace(',', '.')))}>Zapisz</button>
+            <span className="text-xs text-slate-500">Dotyczy nowo dodawanych materiałów. W pojedynczym wierszu narzut można zmienić ręcznie.</span>
+          </>
+        ) : <strong>{narzutDomyslny}%</strong>}
+      </div>
 
       <div className="flex flex-wrap gap-3">
         <input className="pole max-w-sm" placeholder="Szukaj: opis lub indeks SAP" value={fraza} onChange={(e) => setFraza(e.target.value)} />

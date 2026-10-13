@@ -7,8 +7,10 @@
  * potwierdzi szczegóły na realnym przykładzie, zmienia się tylko funkcja wierszeSap().
  *
  * ZAŁOŻENIA DO POTWIERDZENIA z Justyną (na podstawie cennika i starych kart):
- *  1. "Numer linii" = numer linii pozycji w kontrakcie (kolumna "Numer linii" cennika,
- *     np. 10 dla pompy 3X9K, 2000 dla materiału w grupie pomp).
+ *  1. "Numer linii" = numer linii ZAMÓWIENIA w SAP - nadaje go Synthos przy tworzeniu
+ *     zamówienia (potwierdzone przez dział handlowy 2026-10-13), więc NIE pochodzi z cennika.
+ *     Bierzemy go z pozycji (nr_linii_sap), a gdy pusty - z numeru linii zlecenia dla usług
+ *     (linia_uslugi) albo materiałów (linia_materialy). Brak = pusta komórka do uzupełnienia w SAP.
  *  2. Materiał idzie pod uniwersalną usługę "Materiał branża mechaniczna +15%" (5004062)
  *     z ceną cennikową 1 zł/JD, więc Ilość = wartość z narzutem, Cena = 1.
  *     Dodatkowo wypełniamy Cena Mat. (cena jedn. z narzutem) i Ilość Mat. (sztuki),
@@ -42,6 +44,8 @@ export interface ZlecenieDoEksportu {
   nr_zamowienia: string | null
   pozycja_zamowienia: number | null
   nazwa: string
+  linia_uslugi?: number | null
+  linia_materialy?: number | null
   pozycje_uslug: {
     ilosc: number
     cena: number
@@ -52,6 +56,7 @@ export interface ZlecenieDoEksportu {
     wlasny_opis?: string | null
     wlasna_jm?: string | null
     wlasny_indeks?: string | null
+    nr_linii_sap?: number | null
   }[]
   pozycje_materialowe: {
     nazwa: string
@@ -88,13 +93,13 @@ export function wierszeSap(z: ZlecenieDoEksportu, materialy: MaterialWgKategorii
     const c = u.cennik_pozycje
     if (!c) {
       wiersze.push([
-        null, u.wlasny_indeks ?? '', (u.wlasny_opis ?? '').slice(0, MAKS_KROTKI_TEKST), Number(u.ilosc), null,
+        u.nr_linii_sap ?? z.linia_uslugi ?? null, u.wlasny_indeks ?? '', (u.wlasny_opis ?? '').slice(0, MAKS_KROTKI_TEKST), Number(u.ilosc), null,
         u.wlasna_jm ?? 'JD', cenaUslugi(u, Number(u.cena)), wartoscUslugi(u, Number(u.cena)), null, null, null,
       ])
       continue
     }
     wiersze.push([
-      c.numer_linii, c.indeks_sap, c.opis.slice(0, MAKS_KROTKI_TEKST), Number(u.ilosc), null, c.jm,
+      u.nr_linii_sap ?? z.linia_uslugi ?? null, c.indeks_sap, c.opis.slice(0, MAKS_KROTKI_TEKST), Number(u.ilosc), null, c.jm,
       cenaUslugi(u, Number(u.cena)), wartoscUslugi(u, Number(u.cena)), null, null, null,
     ])
   }
@@ -103,7 +108,7 @@ export function wierszeSap(z: ZlecenieDoEksportu, materialy: MaterialWgKategorii
     if (czySynthos(m.dostawca)) continue
     const wartosc = wartoscMaterialu(m)
     wiersze.push([
-      mat?.numer_linii ?? 0, INDEKS_MATERIALU, m.nazwa.slice(0, MAKS_KROTKI_TEKST), wartosc, null,
+      z.linia_materialy ?? null, INDEKS_MATERIALU, m.nazwa.slice(0, MAKS_KROTKI_TEKST), wartosc, null,
       mat?.jm ?? 'JD', 1, wartosc, cenaJednMaterialu(m), Number(m.ilosc), null,
     ])
   }

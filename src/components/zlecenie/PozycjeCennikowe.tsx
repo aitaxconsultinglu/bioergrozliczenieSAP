@@ -54,9 +54,12 @@ export function PozycjeCennikowe({ uslugi, ustaw, szablonZlecenia, edycja }: Pro
     if (istniejaca) {
       ustaw(uslugi.map((u) => (u === istniejaca ? { ...u, ilosc: u.ilosc + 1 } : u)))
     } else {
+      const kat = kategorie.get(cennik.get(id)?.nr_pozycji ?? -1)
       ustaw([...uslugi, {
         klucz: nowyKlucz(), cennik_pozycja_id: id, ilosc: 1, doplata_proc: 0,
         doplata_opis: null, mpk_wykonawcy: null, opis: null,
+        // Domyślnie z kategorii cennika, ale to tylko podpowiedź - da się odznaczyć.
+        wymaga_karty: kat?.wymaga_karty ?? false,
       }])
     }
     setFraza('')
@@ -66,8 +69,16 @@ export function PozycjeCennikowe({ uslugi, ustaw, szablonZlecenia, edycja }: Pro
     ustaw([...uslugi, {
       klucz: nowyKlucz(), cennik_pozycja_id: null, ilosc: 1, doplata_proc: 0, doplata_opis: null,
       mpk_wykonawcy: null, opis: null, wlasny_opis: fraza.trim() || '', wlasna_jm: 'JD', wlasna_cena: 0, wlasny_indeks: '',
+      wymaga_karty: false,
     }])
     setFraza('')
+  }
+
+  // Flaga na pozycji wygrywa; brak flagi (stare wpisy) = domyślne ustawienie kategorii.
+  const wymagaKarty = (u: PozycjaUslugi) => {
+    if (u.wymaga_karty !== undefined && u.wymaga_karty !== null) return u.wymaga_karty
+    const p = u.cennik_pozycja_id === null ? undefined : cennik.get(u.cennik_pozycja_id)
+    return !!(p && kategorie.get(p.nr_pozycji)?.wymaga_karty)
   }
 
   const zmien = (u: PozycjaUslugi, zmiana: Partial<PozycjaUslugi>) =>
@@ -80,6 +91,7 @@ export function PozycjeCennikowe({ uslugi, ustaw, szablonZlecenia, edycja }: Pro
           <table className="w-full border-collapse">
             <thead>
               <tr>
+                <th className="komorka-naglowek w-16" title="Numer linii zamówienia SAP (nadaje Synthos). Puste = numer linii usług z nagłówka zlecenia.">Nr linii</th>
                 <th className="komorka-naglowek w-24">Indeks SAP</th>
                 <th className="komorka-naglowek">Pozycja</th>
                 <th className="komorka-naglowek w-20 text-right">Ilość</th>
@@ -87,6 +99,7 @@ export function PozycjeCennikowe({ uslugi, ustaw, szablonZlecenia, edycja }: Pro
                 <th className="komorka-naglowek w-28 text-right">Cena [zł]</th>
                 <th className="komorka-naglowek w-44">Dopłata</th>
                 <th className="komorka-naglowek w-32 text-right">Wartość [zł]</th>
+                <th className="komorka-naglowek w-14 text-center" title="Czy ta pozycja wymaga karty remontowej (1 karta na sztukę)">Karta</th>
                 <th className="komorka-naglowek w-10" />
               </tr>
             </thead>
@@ -100,6 +113,11 @@ export function PozycjeCennikowe({ uslugi, ustaw, szablonZlecenia, edycja }: Pro
                 const wyborDoplaty = u.doplata_proc === 0 && !u.doplata_opis ? '' : znanaDoplata ? znanaDoplata.opis : INNA_DOPLATA
                 return (
                   <tr key={u.klucz} className={p ? undefined : 'bg-amber-50/40'}>
+                    <td className="komorka p-0">
+                      <input className="pole-komorki liczba" inputMode="numeric" disabled={!edycja} aria-label="Nr linii zamówienia SAP"
+                        value={u.nr_linii_sap ?? ''} placeholder="-"
+                        onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); zmien(u, { nr_linii_sap: v ? Number(v) : null }) }} />
+                    </td>
                     <td className="komorka font-mono text-xs">
                       {p ? p.indeks_sap : (
                         <input className="pole-komorki font-mono" disabled={!edycja} value={u.wlasny_indeks ?? ''} placeholder="(brak)"
@@ -111,9 +129,9 @@ export function PozycjeCennikowe({ uslugi, ustaw, szablonZlecenia, edycja }: Pro
                         <>
                           {p.opis}
                           <span className="ml-2 text-xs text-slate-400">{kat?.nazwa}</span>
-                          {kat?.wymaga_karty && (
+                          {wymagaKarty(u) && (
                             <span className="ml-2 inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 text-xs text-amber-800 ring-1 ring-amber-300">
-                              <FileWarning className="h-3 w-3" /> wymaga karty remontowej
+                              <FileWarning className="h-3 w-3" /> karta remontowa
                             </span>
                           )}
                         </>
@@ -176,6 +194,11 @@ export function PozycjeCennikowe({ uslugi, ustaw, szablonZlecenia, edycja }: Pro
                       )}
                     </td>
                     <td className="komorka liczba font-medium">{zl(wartoscUslugi(u, cena))}</td>
+                    <td className="komorka text-center">
+                      <input type="checkbox" disabled={!edycja} checked={wymagaKarty(u)} aria-label="Wymaga karty remontowej"
+                        title={kat?.wymaga_karty ? 'Kategoria zwykle wymaga karty - odznacz, jeśli w tym zleceniu karta nie jest potrzebna' : 'Zaznacz, jeśli ta pozycja wymaga karty remontowej'}
+                        onChange={(e) => zmien(u, { wymaga_karty: e.target.checked })} />
+                    </td>
                     <td className="komorka text-center">
                       {edycja && (
                         <button aria-label="Usuń pozycję" onClick={() => ustaw(uslugi.filter((x) => x !== u))} className="text-slate-400 hover:text-red-600">

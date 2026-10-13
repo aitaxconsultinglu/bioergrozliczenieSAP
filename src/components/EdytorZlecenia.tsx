@@ -4,9 +4,9 @@ import { supabase } from '@/lib/supabase'
 import { useSlowniki } from '@/lib/slowniki'
 import { komunikatPL } from '@/lib/config'
 import { ETYKIETY_BRAKU, ETYKIETY_STATUSU, KOLORY_STATUSU, dataGodzinaPL, zl } from '@/lib/format'
-import { nowyKlucz, policzSumy } from '@/lib/obliczenia'
+import { czySynthos, grosze, nowyKlucz, policzSumy, wartoscMaterialu } from '@/lib/obliczenia'
 import { SZABLONY, brakiKarty, szablon } from '@/lib/szablony'
-import { KOLUMNY_SAP, tekstDoSchowka, wierszeSap, type ZlecenieDoEksportu } from '@/lib/eksportSap'
+import { KOLUMNY_SAP, etykietaZamowienia, pobierz, tekstDoSchowka, wierszeSap, type ZlecenieDoEksportu } from '@/lib/eksportSap'
 import type {
   BrakGodzin, KartaRemontowa, PozycjaMaterialowa, PozycjaUslugi, Profil, StatusZlecenia, Zlecenie,
 } from '@/lib/types'
@@ -40,6 +40,8 @@ interface Naglowek {
   data_przyjecia: string
   data_zakonczenia: string
   uwagi: string
+  linia_uslugi: string
+  linia_materialy: string
 }
 
 interface Stan {
@@ -54,13 +56,13 @@ interface Historia {
   zamowienia: { nr: string; nazwa: string }[]
   konta: string[]
   mechanicy: string[]
-  materialy: string[]
   numeryKart: string[]
 }
 
 const pustyNaglowek = (mpk: string): Naglowek => ({
   mpk, nr_zamowienia: '', pozycja_zamowienia: '', konto: '', nazwa: '', mechanik: '',
   szablon: 'urzadzenie', dane_szablonu: {}, data_przyjecia: '', data_zakonczenia: '', uwagi: '',
+  linia_uslugi: '', linia_materialy: '',
 })
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -71,12 +73,14 @@ function zBazy(z: any): Stan {
       konto: z.konto ?? '', nazwa: z.nazwa ?? '', mechanik: z.mechanik ?? '', szablon: z.szablon,
       dane_szablonu: z.dane_szablonu ?? {}, data_przyjecia: z.data_przyjecia ?? '',
       data_zakonczenia: z.data_zakonczenia ?? '', uwagi: z.uwagi ?? '',
+      linia_uslugi: z.linia_uslugi?.toString() ?? '', linia_materialy: z.linia_materialy?.toString() ?? '',
     },
     uslugi: [...(z.pozycje_uslug ?? [])].sort((a: any, b: any) => a.kolejnosc - b.kolejnosc || a.id - b.id).map((u: any) => ({
       id: u.id, klucz: `u${u.id}`, cennik_pozycja_id: u.cennik_pozycja_id, ilosc: Number(u.ilosc), cena: Number(u.cena),
       doplata_proc: Number(u.doplata_proc), doplata_opis: u.doplata_opis, mpk_wykonawcy: u.mpk_wykonawcy, opis: u.opis,
       wlasny_opis: u.wlasny_opis, wlasna_jm: u.wlasna_jm, wlasny_indeks: u.wlasny_indeks,
       wlasna_cena: u.wlasna_cena === null ? null : Number(u.wlasna_cena),
+      wymaga_karty: u.wymaga_karty, nr_linii_sap: u.nr_linii_sap,
     })),
     materialy: [...(z.pozycje_materialowe ?? [])].sort((a: any, b: any) => a.kolejnosc - b.kolejnosc || a.id - b.id).map((m: any) => ({
       id: m.id, klucz: `m${m.id}`, nazwa: m.nazwa, ilosc: Number(m.ilosc), jm: m.jm, wartosc_zakupu: Number(m.wartosc_zakupu),
@@ -110,7 +114,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
   const [stan, setStan] = useState<Stan>({ naglowek: pustyNaglowek(mpkDomyslne), uslugi: [], materialy: [], karty: [], braki: [] })
   const [zapisany, setZapisany] = useState<string>('')
   const [meta, setMeta] = useState<Pick<Zlecenie, 'status' | 'komentarz_handlowca' | 'zmodyfikowano' | 'zlozono' | 'wyeksportowano'> | null>(null)
-  const [historia, setHistoria] = useState<Historia>({ zamowienia: [], konta: [], mechanicy: [], materialy: [], numeryKart: [] })
+  const [historia, setHistoria] = useState<Historia>({ zamowienia: [], konta: [], mechanicy: [], numeryKart: [] })
   const [ladowanie, setLadowanie] = useState(!!idZrodla)
   const [zajety, setZajety] = useState(false)
   const [blad, setBlad] = useState<string | null>(null)
@@ -141,8 +145,8 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
       // Kopia: ten sam typ pracy (nagłówek + pozycje cennikowe + robocizna), bez numeru
       // zamówienia, dat, materiałów z faktur, kart i braków - to zawsze nowe dane.
       const nowy: Stan = {
-        naglowek: { ...s.naglowek, nr_zamowienia: '', pozycja_zamowienia: '', data_przyjecia: '', data_zakonczenia: '', uwagi: '' },
-        uslugi: s.uslugi.map((u) => ({ ...u, id: undefined, cena: undefined, klucz: nowyKlucz() })),
+        naglowek: { ...s.naglowek, nr_zamowienia: '', pozycja_zamowienia: '', linia_uslugi: '', linia_materialy: '', data_przyjecia: '', data_zakonczenia: '', uwagi: '' },
+        uslugi: s.uslugi.map((u) => ({ ...u, id: undefined, cena: undefined, nr_linii_sap: null, klucz: nowyKlucz() })),
         materialy: [], karty: [], braki: [],
       }
       setStan(nowy)
@@ -166,9 +170,8 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
   // więc aplikacja podpowiada to, co już kiedyś wpisano (w obrębie widocznych MPK).
   useEffect(() => {
     void (async () => {
-      const [z, m, k] = await Promise.all([
+      const [z, k] = await Promise.all([
         supabase.from('zlecenia').select('nr_zamowienia, nazwa, konto, mechanik').order('zmodyfikowano', { ascending: false }).limit(1500),
-        supabase.from('pozycje_materialowe').select('nazwa').order('utworzono', { ascending: false }).limit(2000),
         supabase.from('karty_remontowe').select('numer_karty').not('numer_karty', 'is', null).order('utworzono', { ascending: false }).limit(2000),
       ])
       const unik = (xs: (string | null)[]) => [...new Set(xs.filter((x): x is string => !!x && !!x.trim()))]
@@ -178,7 +181,6 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
         zamowienia: [...zamowienia.entries()].map(([nr, nazwa]) => ({ nr, nazwa })),
         konta: unik((z.data ?? []).map((r) => r.konto)),
         mechanicy: unik((z.data ?? []).map((r) => r.mechanik)),
-        materialy: unik((m.data ?? []).map((r) => r.nazwa)),
         numeryKart: unik((k.data ?? []).map((r) => r.numer_karty)),
       })
     })()
@@ -198,7 +200,9 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
 
   const wymaganeKarty = useMemo(() => Math.ceil(uslugi.reduce((s, u) => {
     const p = u.cennik_pozycja_id === null ? undefined : cennik.get(u.cennik_pozycja_id)
-    return p && kategorie.get(p.nr_pozycji)?.wymaga_karty ? s + u.ilosc : s
+    // Flaga na pozycji wygrywa; brak flagi = domyślnie z kategorii cennika.
+    const wymaga = u.wymaga_karty ?? !!(p && kategorie.get(p.nr_pozycji)?.wymaga_karty)
+    return wymaga ? s + u.ilosc : s
   }, 0)), [uslugi, cennik, kategorie])
 
   // Numer kolejnej karty: KR nn/mm/rrrr, nn = następny wolny w bieżącym miesiącu.
@@ -217,6 +221,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
     if (!naglowek.nazwa.trim()) return 'Wpisz nazwę zlecenia (np. „POMPA 3X9K NR 422”).'
     if (!naglowek.mpk) return 'Wybierz MPK.'
     if (naglowek.pozycja_zamowienia && !/^\d+$/.test(naglowek.pozycja_zamowienia)) return 'Pozycja zamówienia musi być liczbą (np. 10, 20).'
+    if ([naglowek.linia_uslugi, naglowek.linia_materialy].some((x) => x && !/^\d+$/.test(x))) return 'Numer linii zamówienia musi być liczbą (np. 10, 20).'
     const spoza = uslugi.filter((u) => u.cennik_pozycja_id === null && u.ilosc > 0)
     if (spoza.some((u) => !(u.wlasny_opis ?? '').trim())) return 'Pozycja spoza cennika musi mieć opis pracy.'
     const mat = bezPustychMaterialow(materialy)
@@ -318,6 +323,19 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
     zamknij()
   }
 
+  async function pobierzPdf(wybrane: KartaRemontowa[]) {
+    setBlad(null)
+    try {
+      const { pdfKart, nazwaPlikuKart } = await import('@/lib/pdfKarta')
+      const nr = naglowek.nr_zamowienia ? etykietaZamowienia({ nr_zamowienia: naglowek.nr_zamowienia, pozycja_zamowienia: naglowek.pozycja_zamowienia ? Number(naglowek.pozycja_zamowienia) : null }) : ''
+      const blob = await pdfKart(wybrane, { nazwaZlecenia: naglowek.nazwa, nrZamowienia: nr, konto: naglowek.konto, mpk: naglowek.mpk }, bezPustychMaterialow(materialy))
+      pobierz(blob, nazwaPlikuKart(wybrane, nr))
+      if (zmieniony && edycja) setKomunikat('PDF pobrany z bieżącego formularza - pamiętaj zapisać zmiany.')
+    } catch (e) {
+      setBlad(`Nie udało się utworzyć PDF: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
   function wroc() {
     if (zmieniony && edycja && !window.confirm('Masz niezapisane zmiany. Wyjść bez zapisywania?')) return
     zamknij()
@@ -335,6 +353,8 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
     const z: ZlecenieDoEksportu = {
       id: idZrodla ?? '', mpk: naglowek.mpk, nr_zamowienia: naglowek.nr_zamowienia, nazwa: naglowek.nazwa,
       pozycja_zamowienia: naglowek.pozycja_zamowienia ? Number(naglowek.pozycja_zamowienia) : null,
+      linia_uslugi: naglowek.linia_uslugi ? Number(naglowek.linia_uslugi) : null,
+      linia_materialy: naglowek.linia_materialy ? Number(naglowek.linia_materialy) : null,
       pozycje_uslug: uslugi
         .filter((u) => u.ilosc > 0 && (u.cennik_pozycja_id === null || cennik.has(u.cennik_pozycja_id)))
         .map((u, i) => {
@@ -342,6 +362,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
           return {
             ilosc: u.ilosc, cena: u.cena ?? c?.cena ?? u.wlasna_cena ?? 0, doplata_proc: u.doplata_proc,
             kolejnosc: i, cennik_pozycje: c, wlasny_opis: u.wlasny_opis, wlasna_jm: u.wlasna_jm, wlasny_indeks: u.wlasny_indeks,
+            nr_linii_sap: u.nr_linii_sap,
           }
         }),
       pozycje_materialowe: bezPustychMaterialow(materialy).map((m, i) => ({ ...m, kolejnosc: i })),
@@ -422,6 +443,16 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
               inputMode="numeric" onChange={(e) => ustawNaglowek({ pozycja_zamowienia: e.target.value.trim() })} />
           </label>
           <label className="block">
+            <span className="etykieta" title="Numer linii nadaje Synthos przy tworzeniu zamówienia w SAP - przepisz go z zamówienia. Puste = uzupełnisz w SAP.">Nr linii zam. - usługi</span>
+            <input className="pole" disabled={!edycja} value={naglowek.linia_uslugi} placeholder="np. 10" inputMode="numeric"
+              onChange={(e) => ustawNaglowek({ linia_uslugi: e.target.value.trim() })} />
+          </label>
+          <label className="block">
+            <span className="etykieta" title="Numer linii zamówienia SAP dla materiałów (najczęściej 20) - nadaje Synthos.">Nr linii zam. - materiały</span>
+            <input className="pole" disabled={!edycja} value={naglowek.linia_materialy} placeholder="np. 20" inputMode="numeric"
+              onChange={(e) => ustawNaglowek({ linia_materialy: e.target.value.trim() })} />
+          </label>
+          <label className="block">
             <span className="etykieta">Konto</span>
             <input className="pole" list="hist-konta" disabled={!edycja} value={naglowek.konto} placeholder="URR/1/2026/BZ"
               onChange={(e) => ustawNaglowek({ konto: e.target.value })} />
@@ -467,13 +498,14 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
 
       <section className="sekcja">
         <h3 className="mb-3 font-semibold">Materiały</h3>
-        <TabelaMaterialow materialy={materialy} ustaw={ustaw('materialy')} podpowiedzi={historia.materialy} edycja={edycja} />
+        <TabelaMaterialow materialy={materialy} ustaw={ustaw('materialy')} edycja={edycja} />
       </section>
 
       <section className="sekcja">
         <h3 className="mb-3 font-semibold">Karty remontowe</h3>
         <KartyRemontowe karty={karty} ustaw={ustaw('karty')} wymagane={wymaganeKarty} szablonZlecenia={naglowek.szablon}
-          nazwaZlecenia={naglowek.nazwa} mechanik={naglowek.mechanik} numerKarty={numerKarty} edycja={edycja} />
+          nazwaZlecenia={naglowek.nazwa} mechanik={naglowek.mechanik} numerKarty={numerKarty} edycja={edycja}
+          pdf={(k) => void pobierzPdf(k)} />
       </section>
 
       <section className="sekcja">
@@ -545,6 +577,23 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
               ))}
             </tbody>
           </table>
+          {(() => {
+            const mat = bezPustychMaterialow(materialy).filter((m) => !czySynthos(m.dostawca))
+            if (!mat.length) return null
+            const zakup = grosze(mat.reduce((s, m) => s + m.wartosc_zakupu, 0))
+            const razem = grosze(mat.reduce((s, m) => s + wartoscMaterialu(m), 0))
+            return (
+              <p className="mt-2 rounded bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                Materiał: zakup <strong>{zl(zakup)} zł</strong> + narzut <strong>{zl(grosze(razem - zakup))} zł</strong> = <strong>{zl(razem)} zł</strong>.
+                W SAP idzie pod usługą 5004062 (cena cennikowa 1 zł/JD), więc „Ilość” = wartość z narzutem, a „Cena Mat.” = cena jednostkowa z narzutem.
+              </p>
+            )
+          })()}
+          {podgladSap.some((w) => w[0] === null) && (
+            <p className="mt-2 rounded bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              Brak numeru linii zamówienia w części wierszy - numer nadaje Synthos w zamówieniu. Wpisz go w nagłówku („Nr linii zam.”) albo uzupełnij w SAP po wklejeniu.
+            </p>
+          )}
           <Button className="mt-2" onClick={() => void navigator.clipboard.writeText(tekstDoSchowka(podgladSap)).then(() => setKomunikat('Skopiowano wiersze SAP do schowka.'))}>
             <ClipboardCopy className="h-4 w-4" /> Kopiuj do schowka (Ctrl+V w SAP)
           </Button>

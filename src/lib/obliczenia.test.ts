@@ -40,8 +40,9 @@ describe('eksport SAP', () => {
   ])
   const z: ZlecenieDoEksportu = {
     id: 'x', mpk: 'P04', nr_zamowienia: '4200102057', pozycja_zamowienia: 10, nazwa: 'POMPA 3X9K',
+    linia_uslugi: 10, linia_materialy: 20,
     pozycje_uslug: [
-      { ilosc: 10, cena: 94, doplata_proc: 0, kolejnosc: 1, cennik_pozycje: poz({ id: 4, nr_pozycji: 310, numer_linii: 300, indeks_sap: '5000032', opis: 'Tokarz/frezer/szlifierz (7.00-15.00)', jm: 'H', cena: 94 }) },
+      { ilosc: 10, cena: 94, doplata_proc: 0, kolejnosc: 1, nr_linii_sap: 30, cennik_pozycje: poz({ id: 4, nr_pozycji: 310, numer_linii: 300, indeks_sap: '5000032', opis: 'Tokarz/frezer/szlifierz (7.00-15.00)', jm: 'H', cena: 94 }) },
       { ilosc: 5, cena: 639, doplata_proc: 0, kolejnosc: 0, cennik_pozycje: poz({}) },
     ],
     pozycje_materialowe: [
@@ -52,17 +53,22 @@ describe('eksport SAP', () => {
   const wiersze = wierszeSap(z, materialy)
 
   it('ma 11 kolumn w każdym wierszu', () => wiersze.forEach((w) => expect(w).toHaveLength(11)))
+  it('numer linii z zamówienia, nie z cennika; bez numeru = pusta komórka', () => {
+    const bez = wierszeSap({ ...z, linia_uslugi: null, linia_materialy: null }, materialy)
+    expect(bez[0][0]).toBeNull()
+    expect(bez[2][0]).toBeNull()
+  })
   it('pozycja cennikowa przed robocizną (sort wg kategorii i linii)', () => {
     expect(wiersze[0].slice(0, 4)).toEqual([10, '5000161', 'Remont pompy typ 3X9K', 5])
     expect(wiersze[0][7]).toBe(3195)
-    expect(wiersze[1].slice(0, 2)).toEqual([300, '5000032'])
+    expect(wiersze[1].slice(0, 2)).toEqual([30, '5000032']) // nr linii z pozycji nadpisuje linię zlecenia
   })
-  it('materiał pod linią materiałową kategorii pompy, ilość = wartość z narzutem, cena 1', () => {
-    expect(wiersze[2]).toEqual([2000, '5004062', 'SIMMERING 35X55X10', 96.03, null, 'JD', 1, 96.03, 9.6, 10, null])
+  it('materiał pod numerem linii materiałów z zamówienia, ilość = wartość z narzutem, cena 1', () => {
+    expect(wiersze[2]).toEqual([20, '5004062', 'SIMMERING 35X55X10', 96.03, null, 'JD', 1, 96.03, 9.6, 10, null])
   })
   it('materiał Synthos nie trafia do eksportu', () => expect(wiersze).toHaveLength(3))
   it('schowek: tabulatory, przecinek dziesiętny, bez nagłówka', () => {
-    expect(tekstDoSchowka([wiersze[2]])).toBe('2000\t5004062\tSIMMERING 35X55X10\t96,03\t\tJD\t1\t96,03\t9,6\t10\t')
+    expect(tekstDoSchowka([wiersze[2]])).toBe('20\t5004062\tSIMMERING 35X55X10\t96,03\t\tJD\t1\t96,03\t9,6\t10\t')
   })
 })
 
