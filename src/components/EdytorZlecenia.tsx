@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ClipboardCopy, Copy, Printer, Save, Send, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, ClipboardCopy, Copy, FileSpreadsheet, Printer, Save, Send, Trash2, Undo2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useSlowniki } from '@/lib/slowniki'
 import { komunikatPL } from '@/lib/config'
 import { ETYKIETY_BRAKU, ETYKIETY_STATUSU, KOLORY_STATUSU, dataGodzinaPL, zl } from '@/lib/format'
 import { czySynthos, grosze, nowyKlucz, policzSumy, wartoscMaterialu } from '@/lib/obliczenia'
 import { SZABLONY, brakiKarty, szablon } from '@/lib/szablony'
-import { KOLUMNY_SAP, etykietaZamowienia, pobierz, tekstDoSchowka, wierszeSap, type ZlecenieDoEksportu } from '@/lib/eksportSap'
+import { KOLUMNY_SAP, etykietaZamowienia, plikXlsx, pobierz, tekstDoSchowka, wierszeSap, type ZlecenieDoEksportu } from '@/lib/eksportSap'
 import type {
   BrakGodzin, KartaRemontowa, PozycjaMaterialowa, PozycjaUslugi, Profil, StatusZlecenia, Zlecenie,
 } from '@/lib/types'
@@ -348,8 +348,8 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
     setWpisyAudytu(data ?? [])
   }
 
-  // Podgląd eksportu SAP z bieżącego stanu formularza.
-  const podgladSap = useMemo(() => {
+  // Zlecenie w kształcie eksportu - z bieżącego stanu formularza (podgląd SAP i XLSX).
+  const doEksportu = useMemo<ZlecenieDoEksportu>(() => {
     const z: ZlecenieDoEksportu = {
       id: idZrodla ?? '', mpk: naglowek.mpk, nr_zamowienia: naglowek.nr_zamowienia, nazwa: naglowek.nazwa,
       pozycja_zamowienia: naglowek.pozycja_zamowienia ? Number(naglowek.pozycja_zamowienia) : null,
@@ -367,8 +367,20 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
         }),
       pozycje_materialowe: bezPustychMaterialow(materialy).map((m, i) => ({ ...m, kolejnosc: i })),
     }
-    return wierszeSap(z, materialWgKategorii)
-  }, [idZrodla, naglowek, uslugi, materialy, cennik, materialWgKategorii])
+    return z
+  }, [idZrodla, naglowek, uslugi, materialy, cennik])
+  const podgladSap = useMemo(() => wierszeSap(doEksportu, materialWgKategorii), [doEksportu, materialWgKategorii])
+
+  async function pobierzXlsx() {
+    setBlad(null)
+    try {
+      const nr = doEksportu.nr_zamowienia ? etykietaZamowienia(doEksportu) : 'bez_numeru'
+      pobierz(await plikXlsx([doEksportu], materialWgKategorii), `SAP_rozliczenie_${nr}.xlsx`.replace(/[\\/:*?"<>|\s]+/g, '_'))
+      if (zmieniony && edycja) setKomunikat('XLSX pobrany z bieżącego formularza - pamiętaj zapisać zmiany.')
+    } catch (e) {
+      setBlad(`Nie udało się utworzyć pliku: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
 
   if (ladowanie) return <p className="text-slate-500">Wczytywanie zlecenia...</p>
 
@@ -391,6 +403,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
         )}
         <div className="ml-auto flex flex-wrap gap-2">
           {!nowe && <Button onClick={() => otworzInne(`kopia:${idZrodla}`)} title="Nowe zlecenie z tym samym nagłówkiem i pozycjami"><Copy className="h-4 w-4" /> Kopiuj jako nowe</Button>}
+          <Button onClick={() => void pobierzXlsx()} title="Linie SAP + szczegóły rozliczenia (cennik, roboczogodziny, materiał)"><FileSpreadsheet className="h-4 w-4" /> XLSX</Button>
           {!nowe && <Button onClick={() => window.print()}><Printer className="h-4 w-4" /> Drukuj</Button>}
           {!nowe && ((handlowiec && status !== 'wyeksportowany') || (!handlowiec && status === 'roboczy')) && (
             <Button onClick={() => setPotwierdzUsun(true)}><Trash2 className="h-4 w-4" /> Usuń</Button>
@@ -594,6 +607,9 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
               Brak numeru linii zamówienia w części wierszy - numer nadaje Synthos w zamówieniu. Wpisz go w nagłówku („Nr linii zam.”) albo uzupełnij w SAP po wklejeniu.
             </p>
           )}
+          <Button className="mr-2 mt-2" wariant="akcent" onClick={() => void pobierzXlsx()}>
+            <FileSpreadsheet className="h-4 w-4" /> Pobierz XLSX (całe rozliczenie)
+          </Button>
           <Button className="mt-2" onClick={() => void navigator.clipboard.writeText(tekstDoSchowka(podgladSap)).then(() => setKomunikat('Skopiowano wiersze SAP do schowka.'))}>
             <ClipboardCopy className="h-4 w-4" /> Kopiuj do schowka (Ctrl+V w SAP)
           </Button>

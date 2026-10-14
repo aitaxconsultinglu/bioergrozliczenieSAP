@@ -90,8 +90,8 @@ export function Instrukcja({ profil }: { profil: Profil }) {
             <p>Godziny przepracowane przez ludzi z innego MPK dodaj w części <strong>„Kooperacja z innym MPK”</strong>. Zastępuje to dopiski typu „20 RBG DLA SPORYSZ”.</p>
           </Krok>
           <Krok nr={5} tytul="Materiały">
-            <p>Zacznij pisać nazwę, np. „łożysko 6308”. Aplikacja pokaże <strong>5 ostatnich zakupów</strong> tego materiału z datą, numerem faktury i ceną.
-              Kliknij cenę, a wstawią się nazwa, cena zakupu i numer faktury.</p>
+            <p>Zacznij pisać nazwę, np. „łożysko 6308”. Aplikacja pokaże pasujące towary z <strong>cenami zakupu z Optimy</strong> (dokument PZ/FZ, dostawca, miesiąc)
+              i z wcześniejszych rozliczeń, do 5 ostatnich zakupów na towar. Kliknij cenę, a wstawią się nazwa, cena zakupu i dokument.</p>
             <p>Możesz też wpisać ręcznie <strong>cenę za jednostkę</strong> albo <strong>łączną wartość z faktury</strong>, a drugie pole policzy się samo.
               Narzut (domyślnie 12%) i wartość z narzutem liczą się automatycznie i są widoczne w osobnych kolumnach. Enter w ostatniej kolumnie dodaje wiersz.</p>
             <p><strong>Dostarczył</strong>: Bioerg, <strong>Synthos (narzut 0%, nie idzie do rozliczenia)</strong> albo „inne (wpisz)”, np. „z demontażu”. Przy innym dostawcy narzut ustawiasz sam.</p>
@@ -126,7 +126,13 @@ export function Instrukcja({ profil }: { profil: Profil }) {
             </Krok>
             <Krok nr={2} tytul="Wklejenie do SAP">
               <p><strong>Kopiuj</strong> przy zleceniu kopiuje jego linie do schowka. W SAP otwórz rozliczenie tego zamówienia i wklej (Ctrl+V).</p>
-              <p>Można też zaznaczyć kilka zleceń i kliknąć <strong>„Pobierz XLSX”</strong>. Plik ma arkusz z zestawieniem i osobny arkusz dla każdego zamówienia.</p>
+              <p>Można też zaznaczyć kilka zleceń i kliknąć <strong>„Pobierz XLSX”</strong>. W pliku:</p>
+              <ul className="list-disc pl-5">
+                <li><strong>„Linie SAP”</strong> (pierwszy arkusz) - wszystkie zamówienia jedno pod drugim, gotowe do skopiowania;</li>
+                <li><strong>„Szczegóły”</strong> - całe rozliczenie: pozycje z cennika, roboczogodziny i materiał z ceną zakupu, narzutem i dokumentem PZ/FZ;</li>
+                <li><strong>„Zestawienie”</strong> - suma na zamówienie, oraz osobny arkusz dla każdego zamówienia.</li>
+              </ul>
+              <p>Ten sam plik dla pojedynczego zlecenia pobierzesz przyciskiem <strong>„XLSX”</strong> u góry zlecenia.</p>
             </Krok>
             <Krok nr={3} tytul="Oznacz jako wyeksportowane">
               <p>Po wprowadzeniu do SAP zaznacz zlecenia i kliknij <strong>„Oznacz jako wyeksportowane”</strong>. Znikną z listy i będą zablokowane, więc nic nie zostanie wklejone dwa razy.
@@ -135,7 +141,13 @@ export function Instrukcja({ profil }: { profil: Profil }) {
             <Krok nr={4} tytul="Poprawki">
               <p>Drobny błąd możesz poprawić sama w zleceniu i kliknąć „Zapisz”. Jeśli poprawić musi kierownik, kliknij <strong>„Zwróć do poprawki”</strong> i napisz, co nie gra.</p>
             </Krok>
-            <Krok nr={5} tytul="Braki godzin, cennik, użytkownicy">
+            <Krok nr={5} tytul="Ceny z Optimy">
+              <p>W zakładce <strong>„Ceny z Optimy”</strong> wgrywasz eksport listy <strong>Handel → Zasoby</strong> (Excel). Od tej chwili przy wpisywaniu materiału
+                aplikacja podpowiada towary z Optimy z ceną zakupu, dokumentem PZ/FZ i dostawcą.</p>
+              <p>Lista „Zasoby” zawiera tylko <strong>ostatni</strong> zakup każdego towaru. Wgrywaj nowy eksport np. raz w tygodniu: każdy import dopisuje nowe zakupy,
+                więc historia „5 ostatnich zakupów” będzie rosła.</p>
+            </Krok>
+            <Krok nr={6} tytul="Braki godzin, cennik, użytkownicy">
               <p><strong>Braki godzin</strong>: lista zgłoszonych braków z podsumowaniem na MPK. Zmieniasz w niej status: zgłoszony → uzupełniony przez klienta → rozliczony.</p>
               <p><strong>Cennik</strong>: podgląd umowy, <strong>domyślny narzut na materiał</strong> (obecnie 12%) i ustawienie, które kategorie domyślnie wymagają karty remontowej.</p>
               <p><strong>Użytkownicy</strong>: zakładanie kont (hasło tymczasowe pokazuje się raz), zmiana roli (kierownik / dział handlowy), przypisywanie MPK kierownikom, reset hasła.</p>

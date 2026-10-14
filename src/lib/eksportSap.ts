@@ -65,6 +65,8 @@ export interface ZlecenieDoEksportu {
     narzut_proc: number
     dostawca: Dostawca
     kolejnosc: number
+    jm?: string
+    numer_faktury?: string | null
   }[]
 }
 
@@ -145,24 +147,83 @@ const STYL_NAGLOWKA = {
  * Plik XLSX: arkusz "Zestawienie" + jeden arkusz na zlecenie (nazwa = nr zamówienia),
  * bo w SAP rozliczenie wprowadza się osobno dla każdego zamówienia.
  */
+/** Wiersze arkusza "Szczegóły": całe rozliczenie zlecenia, także to, czego nie ma w układzie SAP. */
+export const KOLUMNY_SZCZEGOLOW = [
+  'Nr zamówienia', 'Zlecenie', 'MPK', 'Rodzaj', 'Nr linii SAP', 'Indeks SAP', 'Opis', 'Ilość', 'JM',
+  'Cena', 'Wartość', 'Zakup (materiał)', 'Narzut %', 'Narzut [zł]', 'Dokument (PZ/FZ)', 'Dostarczył',
+] as const
+
+export function wierszeSzczegolow(z: ZlecenieDoEksportu): (string | number | null)[][] {
+  const nr = etykietaZamowienia(z)
+  const wynik: (string | number | null)[][] = []
+  for (const u of z.pozycje_uslug) {
+    const c = u.cennik_pozycje
+    const rodzaj = !c ? 'Spoza cennika' : c.nr_pozycji === GRUPA_ROBOCIZNY ? 'Robocizna wg rbg' : 'Robocizna wg cennika'
+    wynik.push([
+      nr, z.nazwa, z.mpk, rodzaj, u.nr_linii_sap ?? z.linia_uslugi ?? null, c?.indeks_sap ?? u.wlasny_indeks ?? '',
+      c?.opis ?? u.wlasny_opis ?? '', Number(u.ilosc), c?.jm ?? u.wlasna_jm ?? '',
+      cenaUslugi(u, Number(u.cena)), wartoscUslugi(u, Number(u.cena)), null,
+      u.doplata_proc ? u.doplata_proc : null, null, null, null,
+    ])
+  }
+  for (const m of [...z.pozycje_materialowe].sort((a, b) => a.kolejnosc - b.kolejnosc)) {
+    const synthos = czySynthos(m.dostawca)
+    const zNarzutem = synthos ? 0 : wartoscMaterialu(m)
+    wynik.push([
+      nr, z.nazwa, z.mpk, synthos ? 'Materiał Synthos (bez rozliczenia)' : 'Materiał', synthos ? null : z.linia_materialy ?? null,
+      synthos ? '' : INDEKS_MATERIALU, m.nazwa, Number(m.ilosc), m.jm ?? '',
+      synthos ? 0 : cenaJednMaterialu(m), zNarzutem, synthos ? 0 : m.wartosc_zakupu,
+      synthos ? 0 : m.narzut_proc, synthos ? 0 : grosze(zNarzutem - m.wartosc_zakupu), m.numer_faktury ?? '',
+      synthos ? 'Synthos' : m.dostawca === 'bioerg' ? 'Bioerg' : m.dostawca,
+    ])
+  }
+  return wynik
+}
+
+/**
+ * Plik XLSX - na pierwszym arkuszu od razu wszystko, co trzeba wkleić do SAP:
+ *   1. "Linie SAP"   - wszystkie zaznaczone zamówienia jedno pod drugim (nagłówek bloku = zamówienie),
+ *   2. "Szczegóły"   - całe rozliczenie: cennik, roboczogodziny, materiał z zakupem/narzutem/dokumentem,
+ *   3. "Zestawienie" - jedno zamówienie = jeden wiersz z sumą,
+ *   4. arkusz na każde zamówienie - sam układ SAP, do kopiowania 1:1.
+ */
 export async function plikXlsx(zlecenia: ZlecenieDoEksportu[], materialy: MaterialWgKategorii): Promise<Blob> {
   // Biblioteka XLSX (~700 kB) ładowana dopiero przy eksporcie - kierownicy jej nie potrzebują.
   const { default: XLSX } = await import('xlsx-js-style')
+  type Arkusz = ReturnType<typeof XLSX.utils.aoa_to_sheet>
   const wb = XLSX.utils.book_new()
+  const styluj = (ws: Arkusz, wiersz: number, kolumn: number, styl: object) => {
+    for (let c = 0; c < kolumn; c++) {
+      const adres = XLSX.utils.encode_cell({ r: wiersz, c })
+      if (ws[adres]) ws[adres].s = styl
+    }
+  }
+  const STYL_BLOKU = { font: { bold: true, sz: 12 }, fill: { fgColor: { rgb: 'DFF3FB' } } }
+
+  // 1. Linie SAP - wszystko na jednym arkuszu
+  const linie: (string | number | null)[][] = []
+  const naglowkiBlokow: number[] = []
+  const naglowkiKolumn: number[] = []
   const zestawienie: (string | number)[][] = [['Nr zamówienia', 'MPK', 'Nazwa', 'Liczba linii', 'Wartość']]
-  const arkusze: { nazwa: string; ws: ReturnType<typeof XLSX.utils.aoa_to_sheet> }[] = []
-  const uzyte = new Set<string>(['Zestawienie'])
+  const arkusze: { nazwa: string; ws: Arkusz }[] = []
+  const uzyte = new Set<string>(['Linie SAP', 'Szczegóły', 'Zestawienie'])
+  let razem = 0
 
   for (const z of zlecenia) {
     const wiersze = wierszeSap(z, materialy)
-    zestawienie.push([etykietaZamowienia(z), z.mpk, z.nazwa, wiersze.length, sumaWierszy(wiersze)])
+    const suma = sumaWierszy(wiersze)
+    razem += suma
+    naglowkiBlokow.push(linie.length)
+    linie.push([`Zamówienie ${etykietaZamowienia(z)}  ·  ${z.nazwa}  ·  MPK ${z.mpk}  ·  razem ${suma.toFixed(2).replace('.', ',')} zł`])
+    naglowkiKolumn.push(linie.length)
+    linie.push([...KOLUMNY_SAP])
+    linie.push(...wiersze)
+    linie.push([])
+    zestawienie.push([etykietaZamowienia(z), z.mpk, z.nazwa, wiersze.length, suma])
 
     const ws = XLSX.utils.aoa_to_sheet([[...KOLUMNY_SAP], ...wiersze])
     ws['!cols'] = [8, 12, 42, 10, 10, 10, 10, 12, 10, 10, 14].map((wch) => ({ wch }))
-    KOLUMNY_SAP.forEach((_, i) => {
-      const adres = XLSX.utils.encode_cell({ r: 0, c: i })
-      if (ws[adres]) ws[adres].s = STYL_NAGLOWKA
-    })
+    styluj(ws, 0, KOLUMNY_SAP.length, STYL_NAGLOWKA)
     // Nazwa arkusza: max 31 znaków, bez znaków zabronionych, unikalna.
     let nazwa = etykietaZamowienia(z).replace(/[\\/?*[\]:]/g, '_').slice(0, 28)
     let n = 2
@@ -170,10 +231,29 @@ export async function plikXlsx(zlecenia: ZlecenieDoEksportu[], materialy: Materi
     uzyte.add(nazwa)
     arkusze.push({ nazwa, ws })
   }
+  zestawienie.push(['RAZEM', '', '', '', grosze(razem)])
 
+  const wsL = XLSX.utils.aoa_to_sheet(linie)
+  wsL['!cols'] = [8, 12, 42, 10, 10, 10, 10, 12, 10, 10, 14].map((wch) => ({ wch }))
+  naglowkiBlokow.forEach((r) => styluj(wsL, r, 1, STYL_BLOKU))
+  naglowkiKolumn.forEach((r) => styluj(wsL, r, KOLUMNY_SAP.length, STYL_NAGLOWKA))
+  XLSX.utils.book_append_sheet(wb, wsL, 'Linie SAP')
+
+  // 2. Szczegóły - całe rozliczenie
+  const szczegoly = [[...KOLUMNY_SZCZEGOLOW], ...zlecenia.flatMap((z) => wierszeSzczegolow(z))]
+  const wsS = XLSX.utils.aoa_to_sheet(szczegoly)
+  wsS['!cols'] = [14, 26, 6, 22, 8, 10, 40, 8, 6, 10, 12, 12, 8, 10, 18, 14].map((wch) => ({ wch }))
+  styluj(wsS, 0, KOLUMNY_SZCZEGOLOW.length, STYL_NAGLOWKA)
+  XLSX.utils.book_append_sheet(wb, wsS, 'Szczegóły')
+
+  // 3. Zestawienie
   const wsZ = XLSX.utils.aoa_to_sheet(zestawienie)
   wsZ['!cols'] = [16, 6, 50, 12, 14].map((wch) => ({ wch }))
+  styluj(wsZ, 0, 5, STYL_NAGLOWKA)
+  styluj(wsZ, zestawienie.length - 1, 5, { font: { bold: true } })
   XLSX.utils.book_append_sheet(wb, wsZ, 'Zestawienie')
+
+  // 4. Arkusz na zamówienie
   for (const a of arkusze) XLSX.utils.book_append_sheet(wb, a.ws, a.nazwa)
 
   const dane = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })

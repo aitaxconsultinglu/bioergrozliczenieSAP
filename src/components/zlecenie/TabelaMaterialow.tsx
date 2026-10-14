@@ -21,14 +21,20 @@ interface Props {
 }
 
 interface Zakup {
+  towar: string
+  kod: string | null
   nazwa: string
   jm: string
   cena_jedn: number
-  ilosc: number
+  ilosc: number | null
   numer_faktury: string | null
-  dostawca: string
-  data: string
+  dostawca: string | null
+  data: string | null
+  zrodlo: 'Optima' | 'aplikacja'
 }
+
+/** Optima podaje w numerze dokumentu tylko miesiąc (PZ/325/09/2025) - pokazujemy MM.RRRR. */
+const dataZakupu = (z: Zakup) => !z.data ? '' : z.zrodlo === 'Optima' ? `${z.data.slice(5, 7)}.${z.data.slice(0, 4)}` : dataPL(z.data)
 
 /**
  * Materiały: nazwa (z podpowiedzią 5 ostatnich zakupów - cena i nr faktury), ilość,
@@ -78,7 +84,7 @@ export function TabelaMaterialow({ materialy, ustaw, edycja }: Props) {
               <th className="komorka-naglowek w-16 text-right">Narzut %</th>
               <th className="komorka-naglowek w-24 text-right">Narzut [zł]</th>
               <th className="komorka-naglowek w-28 text-right">Wartość z narzutem</th>
-              <th className="komorka-naglowek w-28">Nr faktury</th>
+              <th className="komorka-naglowek w-32" title="Dokument źródłowy zakupu z Optimy (PZ / FZ) albo numer faktury">Dokument (PZ/FZ)</th>
               <th className="komorka-naglowek w-10" />
             </tr>
           </thead>
@@ -137,7 +143,7 @@ export function TabelaMaterialow({ materialy, ustaw, edycja }: Props) {
                     {!synthos && m.ilosc > 0 && <span className="block text-[10px] font-normal text-slate-400">{zl(cenaJednMaterialu(m))} / {m.jm}</span>}
                   </td>
                   <td className="komorka p-0">
-                    <input className="pole-komorki" disabled={!edycja} value={m.numer_faktury ?? ''} aria-label="Nr faktury"
+                    <input className="pole-komorki" disabled={!edycja} value={m.numer_faktury ?? ''} aria-label="Dokument zakupu (PZ/FZ)"
                       onKeyDown={dodajPrzyEnter(i)}
                       onChange={(e) => zmien(m, { numer_faktury: e.target.value || null })} />
                   </td>
@@ -176,7 +182,7 @@ export function TabelaMaterialow({ materialy, ustaw, edycja }: Props) {
       )}
       <p className="text-xs text-slate-500">
         Narzut domyślny: <strong>{narzutDomyslny}%</strong> (zmienia go dział handlowy w zakładce Cennik). Wpisz cenę za jednostkę albo łączną wartość z faktury - drugie pole policzy się samo.
-        Podczas wpisywania nazwy aplikacja podpowiada 5 ostatnich zakupów tego materiału z ceną i numerem faktury.
+        Podczas wpisywania nazwy aplikacja podpowiada do 5 ostatnich zakupów każdego pasującego towaru - z cenami z Optimy (dokument PZ/FZ, dostawca) i z wcześniejszych rozliczeń.
         Materiał od Synthosu: bez narzutu i bez wartości w eksporcie do SAP.
       </p>
     </div>
@@ -201,7 +207,7 @@ function KomorkaNazwy({ wartosc, zmien, wybierz, disabled, autoFocus }: {
     let anulowane = false
     const t = setTimeout(async () => {
       const { data } = await supabase.rpc('historia_zakupow', { p_fraza: wartosc.trim() })
-      if (!anulowane) setWyniki(((data ?? []) as Zakup[]).map((z) => ({ ...z, cena_jedn: Number(z.cena_jedn), ilosc: Number(z.ilosc) })))
+      if (!anulowane) setWyniki(((data ?? []) as Zakup[]).map((z) => ({ ...z, cena_jedn: Number(z.cena_jedn), ilosc: z.ilosc === null ? null : Number(z.ilosc) })))
     }, 250)
     return () => { anulowane = true; clearTimeout(t) }
   }, [wartosc, otwarte])
@@ -218,11 +224,11 @@ function KomorkaNazwy({ wartosc, zmien, wybierz, disabled, autoFocus }: {
     return () => { window.removeEventListener('scroll', ustawPoz, true); window.removeEventListener('resize', ustawPoz) }
   }, [otwarte])
 
+  // Funkcja w bazie zwraca już pogrupowane: towar (kod z Optimy albo nazwa) -> do 5 ostatnich zakupów.
   const grupy = new Map<string, Zakup[]>()
   for (const z of wyniki) {
-    const k = z.nazwa.trim().toUpperCase()
-    if (!grupy.has(k)) grupy.set(k, [])
-    grupy.get(k)!.push(z)
+    if (!grupy.has(z.towar)) grupy.set(z.towar, [])
+    grupy.get(z.towar)!.push(z)
   }
 
   return (
@@ -247,18 +253,24 @@ function KomorkaNazwy({ wartosc, zmien, wybierz, disabled, autoFocus }: {
           onMouseDown={(e) => e.preventDefault()}
         >
           <p className="flex items-center gap-1 border-b border-slate-100 px-3 py-1.5 text-xs text-slate-500">
-            <History className="h-3.5 w-3.5" /> Ostatnie zakupy - kliknij cenę, żeby ją wstawić
+            <History className="h-3.5 w-3.5" /> Ostatnie zakupy (do 5 na towar) - kliknij cenę, żeby ją wstawić
           </p>
           {[...grupy.values()].map((zakupy) => (
-            <div key={zakupy[0].nazwa} className="border-b border-slate-100 px-3 py-1.5 last:border-0">
-              <p className="font-medium">{zakupy[0].nazwa}</p>
+            <div key={zakupy[0].towar} className="border-b border-slate-100 px-3 py-1.5 last:border-0">
+              <p className="flex items-center gap-2 font-medium">
+                {zakupy[0].nazwa}
+                {zakupy[0].kod && <span className="text-xs font-normal text-slate-400">kod {zakupy[0].kod}</span>}
+                <span className={`rounded px-1.5 text-[10px] font-normal ${zakupy[0].zrodlo === 'Optima' ? 'bg-blekit-jasny text-blekit-ciemny' : 'bg-slate-100 text-slate-600'}`}>
+                  {zakupy[0].zrodlo === 'Optima' ? 'Optima' : 'wpisane w aplikacji'}
+                </span>
+              </p>
               {zakupy.map((z, i) => (
                 <button key={i} type="button" onClick={() => { wybierz(z); setOtwarte(false) }}
                   className="flex w-full items-center gap-3 rounded px-1 py-0.5 text-left hover:bg-limonka-jasna">
-                  <span className="w-20 text-xs text-slate-500">{dataPL(z.data)}</span>
-                  <span className="flex-1 truncate text-xs text-slate-600">{z.numer_faktury ? `FV ${z.numer_faktury}` : 'bez nr faktury'}</span>
-                  <span className="text-xs text-slate-400">{z.ilosc.toLocaleString('pl-PL')} {z.jm}</span>
-                  <span className="w-28 text-right font-medium tabular-nums">{zl(z.cena_jedn)} zł/{z.jm}</span>
+                  <span className="w-16 shrink-0 text-xs text-slate-500">{dataZakupu(z)}</span>
+                  <span className="w-32 shrink-0 font-mono text-xs text-slate-700">{z.numer_faktury ?? 'bez dokumentu'}</span>
+                  <span className="flex-1 truncate text-xs text-slate-500" title={z.dostawca ?? undefined}>{z.dostawca ?? ''}</span>
+                  <span className="w-28 shrink-0 text-right font-medium tabular-nums">{zl(z.cena_jedn)} zł/{z.jm}</span>
                 </button>
               ))}
             </div>

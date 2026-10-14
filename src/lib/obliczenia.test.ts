@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { cenaJednMaterialu, cenaUslugi, czySynthos, grosze, wartoscMaterialu, wartoscUslugi } from './obliczenia'
-import { maPozycjeSpozaCennika, tekstDoSchowka, wierszeSap, type ZlecenieDoEksportu } from './eksportSap'
+import { maPozycjeSpozaCennika, tekstDoSchowka, wierszeSap, wierszeSzczegolow, type ZlecenieDoEksportu } from './eksportSap'
 import type { PozycjaCennika } from './types'
 
 describe('grosze', () => {
@@ -95,5 +95,19 @@ describe('otwarte listy', () => {
     expect(w).toHaveLength(2) // materiał "z demontażu" jest, Synthos nie
     expect(w[1][3]).toBe(110)
     expect(maPozycjeSpozaCennika(z)).toBe(true)
+  })
+})
+
+describe('arkusz Szczegóły w XLSX', () => {
+  it('pokazuje cały rozliczenie: rodzaj pozycji, zakup, narzut i dokument', () => {
+    const w = wierszeSzczegolow({
+      id: 's', mpk: 'P04', nr_zamowienia: '4200112773', pozycja_zamowienia: null, nazwa: 'POMPA', linia_materialy: 20,
+      pozycje_uslug: [{ ilosc: 2, cena: 94, doplata_proc: 0, kolejnosc: 0, cennik_pozycje: {
+        id: 1, nr_pozycji: 310, numer_linii: 300, indeks_sap: '5000032', opis: 'Tokarz', jm: 'H', cena: 94, aktywna: true } }],
+      pozycje_materialowe: [{ nazwa: 'ŁOŻYSKO 6308 2Z SKF', ilosc: 1, jm: 'szt', wartosc_zakupu: 73.91, narzut_proc: 12, dostawca: 'bioerg', kolejnosc: 0, numer_faktury: 'PZ/325/09/2025' }],
+    })
+    expect(w[0].slice(3, 4)).toEqual(['Robocizna wg rbg'])
+    expect(w[1]).toEqual(['4200112773', 'POMPA', 'P04', 'Materiał', 20, '5004062', 'ŁOŻYSKO 6308 2Z SKF', 1, 'szt',
+      82.78, 82.78, 73.91, 12, 8.87, 'PZ/325/09/2025', 'Bioerg'])
   })
 })
