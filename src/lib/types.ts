@@ -1,5 +1,5 @@
 export type Rola = 'kierownik' | 'handlowiec'
-export type StatusZlecenia = 'roboczy' | 'zlozony' | 'zwrocony' | 'wyeksportowany'
+export type StatusZlecenia = 'roboczy' | 'zlozony' | 'zwrocony' | 'wyeksportowany' | 'zakonczony'
 export type StatusBraku = 'zgloszony' | 'uzupelniony' | 'rozliczony'
 /** 'bioerg', 'synthos' albo dowolny wpisany tekst (lista jest otwarta). */
 export type Dostawca = string
@@ -62,6 +62,7 @@ export interface Zlecenie {
   zmodyfikowano: string
   zlozono: string | null
   wyeksportowano: string | null
+  zakonczono: string | null
 }
 
 /** Wiersz formularza - id puste dla wierszy jeszcze niezapisanych. */

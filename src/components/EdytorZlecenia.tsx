@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ClipboardCopy, Copy, FileSpreadsheet, Printer, RotateCcw, Save, Send, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, CheckCheck, ClipboardCopy, Copy, FileSpreadsheet, Printer, RotateCcw, Save, Send, Trash2, Undo2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useSlowniki } from '@/lib/slowniki'
 import { komunikatPL } from '@/lib/config'
@@ -113,7 +113,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
 
   const [stan, setStan] = useState<Stan>({ naglowek: pustyNaglowek(mpkDomyslne), uslugi: [], materialy: [], karty: [], braki: [] })
   const [zapisany, setZapisany] = useState<string>('')
-  const [meta, setMeta] = useState<Pick<Zlecenie, 'status' | 'komentarz_handlowca' | 'zmodyfikowano' | 'zlozono' | 'wyeksportowano'> | null>(null)
+  const [meta, setMeta] = useState<Pick<Zlecenie, 'status' | 'komentarz_handlowca' | 'zmodyfikowano' | 'zlozono' | 'wyeksportowano' | 'zakonczono'> | null>(null)
   const [historia, setHistoria] = useState<Historia>({ zamowienia: [], konta: [], mechanicy: [], numeryKart: [] })
   const [ladowanie, setLadowanie] = useState(!!idZrodla)
   const [zajety, setZajety] = useState(false)
@@ -126,7 +126,8 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
   const [potwierdzWycofanie, setPotwierdzWycofanie] = useState(false)
 
   const status: StatusZlecenia = meta?.status ?? 'roboczy'
-  const edycja = nowe || (handlowiec ? status !== 'wyeksportowany' : status === 'roboczy' || status === 'zwrocony')
+  const zamkniete = status === 'wyeksportowany' || status === 'zakonczony'
+  const edycja = nowe || (handlowiec ? !zamkniete : status === 'roboczy' || status === 'zwrocony')
   const { naglowek, uslugi, materialy, karty, braki } = stan
   const zmieniony = JSON.stringify(stan) !== zapisany
 
@@ -159,7 +160,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
     setZapisany(JSON.stringify(s))
     setMeta({
       status: data.status, komentarz_handlowca: data.komentarz_handlowca, zmodyfikowano: data.zmodyfikowano,
-      zlozono: data.zlozono, wyeksportowano: data.wyeksportowano,
+      zlozono: data.zlozono, wyeksportowano: data.wyeksportowano, zakonczono: data.zakonczono,
     })
   }, [kopia])
 
@@ -356,6 +357,17 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
     setKomunikat(`Status zmieniony na „${nowy}”. Powód zapisano w historii zmian.`)
   }
 
+  async function zakonczZlecenie() {
+    if (!idZrodla) return
+    setZajety(true)
+    const { error } = await supabase.rpc('oznacz_zakonczone', { p_ids: [idZrodla] })
+    setZajety(false)
+    if (error) { setBlad(komunikatPL(error.message)); return }
+    setWpisyAudytu(null)
+    await wczytaj(idZrodla)
+    setKomunikat('Zlecenie zakończone. W razie pomyłki użyj „Zmień status”.')
+  }
+
   async function wycofaj() {
     if (!idZrodla) return
     setZajety(true)
@@ -432,7 +444,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
           {!nowe && <Button onClick={() => otworzInne(`kopia:${idZrodla}`)} title="Nowe zlecenie z tym samym nagłówkiem i pozycjami"><Copy className="h-4 w-4" /> Kopiuj jako nowe</Button>}
           <Button onClick={() => void pobierzXlsx()} title="Linie SAP + szczegóły rozliczenia (cennik, roboczogodziny, materiał)"><FileSpreadsheet className="h-4 w-4" /> XLSX</Button>
           {!nowe && <Button onClick={() => window.print()}><Printer className="h-4 w-4" /> Drukuj</Button>}
-          {!nowe && ((handlowiec && status !== 'wyeksportowany') || (!handlowiec && status === 'roboczy')) && (
+          {!nowe && ((handlowiec && !zamkniete) || (!handlowiec && status === 'roboczy')) && (
             <Button onClick={() => setPotwierdzUsun(true)}><Trash2 className="h-4 w-4" /> Usuń</Button>
           )}
         </div>
@@ -445,7 +457,9 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
       )}
       {!edycja && (
         <div className="bez-druku rounded-md bg-slate-100 px-4 py-2 text-sm text-slate-700">
-          {status === 'wyeksportowany'
+          {status === 'zakonczony'
+            ? `Zlecenie zakończone ${dataGodzinaPL(meta?.zakonczono)} - tylko do odczytu.`
+            : status === 'wyeksportowany'
             ? `Zlecenie wyeksportowane do SAP ${dataGodzinaPL(meta?.wyeksportowano)} - tylko do odczytu.`
             : `Zlecenie złożone do rozliczenia ${dataGodzinaPL(meta?.zlozono)} - edycja zablokowana. Jeśli trzeba coś zmienić, poproś dział handlowy o zwrot do poprawki.`}
         </div>
@@ -681,6 +695,11 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
             )}
             {handlowiec && status === 'wyeksportowany' && (
               <Button disabled={zajety} onClick={() => void cofnijEksport()}><Undo2 className="h-4 w-4" /> Cofnij eksport</Button>
+            )}
+            {handlowiec && status === 'wyeksportowany' && (
+              <Button wariant="glowny" disabled={zajety} onClick={() => void zakonczZlecenie()} title="Zamknij zlecenie po rozliczeniu">
+                <CheckCheck className="h-4 w-4" /> Zakończ
+              </Button>
             )}
             {handlowiec && !nowe && (
               <Button disabled={zajety || zmieniony} title={zmieniony ? 'Najpierw zapisz zmiany' : 'Ręczna zmiana statusu, np. po pomyłce'}
