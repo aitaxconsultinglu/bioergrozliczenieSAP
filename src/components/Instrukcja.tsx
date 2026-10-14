@@ -108,6 +108,7 @@ export function Instrukcja({ profil }: { profil: Profil }) {
           <Krok nr={8} tytul="Zapisz i złóż">
             <p><strong>Zapisz</strong> możesz klikać w każdej chwili, nawet z niepełnymi danymi, bo to wersja robocza.
               Na koniec kliknij <strong>„Złóż do rozliczenia”</strong>. Aplikacja nie przepuści zlecenia bez numeru zamówienia i bez kompletnych kart.</p>
+            <p>Złożyłeś za wcześnie albo z błędem? Dopóki dział handlowy nie wyeksportował zlecenia do SAP, kliknij <strong>„Wycofaj do poprawy”</strong> - wróci do wersji roboczej.</p>
             <p>Po złożeniu zlecenie jest zablokowane. Jeśli dział handlowy je zwróci, zobaczysz żółty komunikat z opisem, co poprawić. Popraw i złóż ponownie.</p>
             <p><strong>Drukuj</strong> drukuje zlecenie z kartami, np. do podpisu.</p>
           </Krok>
@@ -139,6 +140,8 @@ export function Instrukcja({ profil }: { profil: Profil }) {
                 Pomyłka? Otwórz zlecenie i kliknij <strong>„Cofnij eksport”</strong>. „Ostatnie eksporty” pozwalają pobrać dawny plik ponownie.</p>
             </Krok>
             <Krok nr={4} tytul="Poprawki">
+              <p><strong>„Zmień status”</strong> (w zleceniu, na dole) pozwala ręcznie ustawić dowolny status: roboczy, złożony, zwrócony, wyeksportowany - np. gdy coś oznaczono przez pomyłkę.
+                Trzeba podać powód; zmiana i powód zapisują się w „Historii zmian” zlecenia. Status braku godzin (zgłoszony / uzupełniony / rozliczony) zmienisz w każdą stronę w zakładce „Braki godzin”.</p>
               <p>Drobny błąd możesz poprawić sama w zleceniu i kliknąć „Zapisz”. Jeśli poprawić musi kierownik, kliknij <strong>„Zwróć do poprawki”</strong> i napisz, co nie gra.</p>
             </Krok>
             <Krok nr={5} tytul="Ceny z Optimy">
