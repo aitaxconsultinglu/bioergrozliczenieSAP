@@ -104,10 +104,10 @@ describe('arkusz Szczegóły w XLSX', () => {
       id: 's', mpk: 'P04', nr_zamowienia: '4200112773', pozycja_zamowienia: null, nazwa: 'POMPA', linia_materialy: 20,
       pozycje_uslug: [{ ilosc: 2, cena: 94, doplata_proc: 0, kolejnosc: 0, cennik_pozycje: {
         id: 1, nr_pozycji: 310, numer_linii: 300, indeks_sap: '5000032', opis: 'Tokarz', jm: 'H', cena: 94, aktywna: true } }],
-      pozycje_materialowe: [{ nazwa: 'ŁOŻYSKO 6308 2Z SKF', ilosc: 1, jm: 'szt', wartosc_zakupu: 73.91, narzut_proc: 12, dostawca: 'bioerg', kolejnosc: 0, numer_faktury: 'PZ/325/09/2025' }],
+      pozycje_materialowe: [{ nazwa: 'ŁOŻYSKO TEST', ilosc: 1, jm: 'szt', wartosc_zakupu: 73.91, narzut_proc: 12, dostawca: 'bioerg', kolejnosc: 0, numer_faktury: 'PZ/1/01/2026' }],
     })
     expect(w[0].slice(3, 4)).toEqual(['Robocizna wg rbg'])
-    expect(w[1]).toEqual(['4200112773', 'POMPA', 'P04', 'Materiał', 20, '5004062', 'ŁOŻYSKO 6308 2Z SKF', 1, 'szt',
-      82.78, 82.78, 73.91, 12, 8.87, 'PZ/325/09/2025', 'Bioerg'])
+    expect(w[1]).toEqual(['4200112773', 'POMPA', 'P04', 'Materiał', 20, '5004062', 'ŁOŻYSKO TEST', 1, 'szt',
+      82.78, 82.78, 73.91, 12, 8.87, 'PZ/1/01/2026', 'Bioerg'])
   })
 })
