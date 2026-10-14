@@ -9,8 +9,8 @@ describe('import eksportu Zasoby z Optimy', () => {
   const wynik = parsujWiersze([
     NAGLOWKI,
     ['000101', 'ŁOŻYSKO 6308 2Z  TEST', 'TP', 'Brak towaru', 0, 0, 'szt', '', 50.5, 0, '23,00 %', 0, 'PZ/1/01/2026', 'DOSTAWCA PRZYKŁADOWY SP. Z O.O.', '', ''],
-    ['032916', ' 2924B TIMKEN pierścień zewnętrzny                                _x000d_\n', 'TP', 'Brak towaru', 0, 0, 'szt', '', 0, 0, '23,00 %', 0, '', '', '', ''],
-    ['023348', ' FARBA NA DACH BRĄZ RAL8017 0,75 L ŚNIEŻKA_x000d_\n', 'TP', 'Brak towaru', 0, 0, 'szt', '', 54.89, 0, '23,00 %', 0, 'PZ/132/05/2025', 'SEWERA', '', ''],
+    ['000102', ' Pierścień testowy                                _x000d_\n', 'TP', 'Brak towaru', 0, 0, 'szt', '', 0, 0, '23,00 %', 0, '', '', '', ''],
+    ['000103', ' FARBA TESTOWA RAL8017 0,75 L_x000d_\n', 'TP', 'Brak towaru', 0, 0, 'szt', '', 20, 0, '23,00 %', 0, 'PZ/2/01/2026', 'HURTOWNIA X', '', ''],
     ['900001', 'Usługa transportowa', 'UZ', 'Usługa', 0, 0, 'usł', '', 100, 0, '23,00 %', 0, '', '', '', ''],
   ])
 
