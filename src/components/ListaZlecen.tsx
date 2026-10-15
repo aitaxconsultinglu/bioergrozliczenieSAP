@@ -17,15 +17,18 @@ interface Wiersz {
   pozycja_zamowienia: number | null
   nazwa: string
   mechanik: string | null
+  konto: string | null
+  nr_azo: string | null
   status: StatusZlecenia
   zmodyfikowano: string
   komentarz_handlowca: string | null
   pozycje_uslug: { ilosc: number; cena: number; doplata_proc: number; cennik_pozycja_id: number | null }[]
   pozycje_materialowe: { wartosc_zakupu: number; narzut_proc: number; dostawca: Dostawca }[]
+  uslugi_obce: { wartosc_zakupu: number; narzut_proc: number }[]
   wartosc: number
 }
 
-type Kolumna = 'nr' | 'nazwa' | 'mpk' | 'mechanik' | 'status' | 'wartosc' | 'zmieniono'
+type Kolumna = 'nr' | 'azo' | 'konto' | 'nazwa' | 'mpk' | 'mechanik' | 'status' | 'wartosc' | 'zmieniono'
 interface Sortowanie { kolumna: Kolumna; rosnaco: boolean }
 
 const KLUCZ_SORTOWANIA = 'rozliczenia.lista.sortowanie'
@@ -47,6 +50,8 @@ const tekst = (a: string | null, b: string | null) => (a ?? '').localeCompare(b 
 function porownaj(a: Wiersz, b: Wiersz, k: Kolumna): number {
   switch (k) {
     case 'nr': return tekst(a.nr_zamowienia, b.nr_zamowienia) || (a.pozycja_zamowienia ?? 0) - (b.pozycja_zamowienia ?? 0)
+    case 'azo': return tekst(a.nr_azo, b.nr_azo)
+    case 'konto': return tekst(a.konto, b.konto)
     case 'nazwa': return tekst(a.nazwa, b.nazwa)
     case 'mpk': return tekst(a.mpk, b.mpk)
     case 'mechanik': return tekst(a.mechanik, b.mechanik)
@@ -80,9 +85,10 @@ export function ListaZlecen({ profil, otworz }: Props) {
     setLadowanie(true)
     const { data, error } = await supabase
       .from('zlecenia')
-      .select(`id, mpk, nr_zamowienia, pozycja_zamowienia, nazwa, mechanik, status, zmodyfikowano, komentarz_handlowca,
+      .select(`id, mpk, nr_zamowienia, pozycja_zamowienia, nazwa, mechanik, konto, nr_azo, status, zmodyfikowano, komentarz_handlowca,
                pozycje_uslug(ilosc, cena, doplata_proc, cennik_pozycja_id),
-               pozycje_materialowe(wartosc_zakupu, narzut_proc, dostawca)`)
+               pozycje_materialowe(wartosc_zakupu, narzut_proc, dostawca),
+               uslugi_obce(wartosc_zakupu, narzut_proc)`)
       .order('zmodyfikowano', { ascending: false })
       .limit(2000)
     setLadowanie(false)
@@ -96,6 +102,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
         w.pozycje_uslug.map((u) => ({ ...u, cena: Number(u.cena), ilosc: Number(u.ilosc), doplata_proc: Number(u.doplata_proc) })),
         w.pozycje_materialowe.map((m) => ({ ...m, wartosc_zakupu: Number(m.wartosc_zakupu), narzut_proc: Number(m.narzut_proc) })),
         cennik,
+        (w.uslugi_obce ?? []).map((u) => ({ wartosc_zakupu: Number(u.wartosc_zakupu), narzut_proc: Number(u.narzut_proc) })),
       ).razem,
     })))
   }, [cennik])
@@ -105,7 +112,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
   function sortuj(kolumna: Kolumna) {
     setSortowanie((s) => {
       // Pierwsze kliknięcie: tekst rosnąco (A→Z), liczby i daty malejąco (najwyższe/najnowsze na górze).
-      const nowe = s.kolumna === kolumna ? { kolumna, rosnaco: !s.rosnaco } : { kolumna, rosnaco: ['nr', 'nazwa', 'mpk', 'mechanik', 'status'].includes(kolumna) }
+      const nowe = s.kolumna === kolumna ? { kolumna, rosnaco: !s.rosnaco } : { kolumna, rosnaco: ['nr', 'azo', 'konto', 'nazwa', 'mpk', 'mechanik', 'status'].includes(kolumna) }
       try { localStorage.setItem(KLUCZ_SORTOWANIA, JSON.stringify(nowe)) } catch { /* brak pamięci przeglądarki - sortowanie działa bez zapamiętania */ }
       return nowe
     })
@@ -116,7 +123,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
     const odfiltrowane = wiersze.filter((w) =>
       (!status || (status === OTWARTE ? w.status !== 'zakonczony' : w.status === status))
       && (!mpk || w.mpk === mpk)
-      && (!fraza || `${w.nazwa} ${w.nr_zamowienia ?? ''} ${w.mechanik ?? ''}`.toLowerCase().includes(fraza)))
+      && (!fraza || `${w.nazwa} ${w.nr_zamowienia ?? ''} ${w.mechanik ?? ''} ${w.nr_azo ?? ''} ${w.konto ?? ''}`.toLowerCase().includes(fraza)))
     const kier = sortowanie.rosnaco ? 1 : -1
     // Przy remisie najnowsze zmiany na górze, żeby kolejność była stabilna.
     return [...odfiltrowane].sort((a, b) => kier * porownaj(a, b, sortowanie.kolumna) || b.zmodyfikowano.localeCompare(a.zmodyfikowano))
@@ -177,7 +184,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
       )}
 
       <div className="flex flex-wrap gap-3">
-        <input className="pole max-w-xs" placeholder="Szukaj: nazwa, nr zamówienia, mechanik" value={szukaj} onChange={(e) => setSzukaj(e.target.value)} />
+        <input className="pole max-w-xs" placeholder="Szukaj: nazwa, nr zamówienia, nr AZO, konto, mechanik" value={szukaj} onChange={(e) => setSzukaj(e.target.value)} />
         <select className="pole w-auto" value={status} onChange={(e) => setStatus(e.target.value as StatusZlecenia | '' | typeof OTWARTE)}>
           <option value="">Wszystkie statusy</option>
           <option value={OTWARTE}>Otwarte (bez zakończonych)</option>
@@ -216,6 +223,8 @@ export function ListaZlecen({ profil, otworz }: Props) {
                 </th>
               )}
               <Naglowek kolumna="nr">Nr zamówienia</Naglowek>
+              <Naglowek kolumna="azo">Nr AZO</Naglowek>
+              <Naglowek kolumna="konto">Konto</Naglowek>
               <Naglowek kolumna="nazwa">Nazwa</Naglowek>
               <Naglowek kolumna="mpk">MPK</Naglowek>
               <Naglowek kolumna="mechanik">Mechanik</Naglowek>
@@ -239,6 +248,8 @@ export function ListaZlecen({ profil, otworz }: Props) {
                   {w.nr_zamowienia ?? <span className="text-slate-400">brak</span>}
                   {w.pozycja_zamowienia ? `-${w.pozycja_zamowienia}` : ''}
                 </td>
+                <td className="komorka whitespace-nowrap font-mono text-sm">{w.nr_azo ?? <span className="text-slate-300">-</span>}</td>
+                <td className="komorka whitespace-nowrap text-sm">{w.konto ?? <span className="text-slate-300">-</span>}</td>
                 <td className="komorka">
                   {w.nazwa}
                   {w.status === 'zwrocony' && w.komentarz_handlowca && (
@@ -257,7 +268,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
               </tr>
             ))}
             {!ladowanie && widoczne.length === 0 && (
-              <tr><td colSpan={handlowiec ? 8 : 7} className="komorka py-8 text-center text-slate-500">Brak zleceń.</td></tr>
+              <tr><td colSpan={handlowiec ? 10 : 9} className="komorka py-8 text-center text-slate-500">Brak zleceń.</td></tr>
             )}
           </tbody>
         </table>

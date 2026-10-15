@@ -12,11 +12,13 @@ import { cn } from '@/lib/utils'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
 
-const ZAPYTANIE = `id, mpk, nr_zamowienia, pozycja_zamowienia, nazwa, mechanik, zlozono, linia_uslugi, linia_materialy,
+const ZAPYTANIE = `id, mpk, nr_zamowienia, pozycja_zamowienia, nazwa, mechanik, zlozono, linia_uslugi, linia_materialy, nr_azo, konto,
+  uslugi_obce(id, opis, wykonawca, numer_faktury, wartosc_zakupu, narzut_proc, nr_linii_sap, kolejnosc),
+  zalaczniki(typ, usluga_obca_id),
   pozycje_uslug(ilosc, cena, doplata_proc, kolejnosc, wlasny_opis, wlasna_jm, wlasny_indeks, nr_linii_sap, cennik_pozycje(*)),
   pozycje_materialowe(nazwa, ilosc, jm, wartosc_zakupu, narzut_proc, dostawca, kolejnosc, numer_faktury)`
 
-type ZlecenieZPanelu = ZlecenieDoEksportu & { mechanik: string | null; zlozono: string | null }
+type ZlecenieZPanelu = ZlecenieDoEksportu & { mechanik: string | null; zlozono: string | null; bezSkanu: number }
 
 interface Eksport {
   id: string
@@ -36,6 +38,9 @@ function normalizuj(z: any): ZlecenieZPanelu {
     pozycje_materialowe: z.pozycje_materialowe.map((m: any) => ({
       ...m, ilosc: Number(m.ilosc), wartosc_zakupu: Number(m.wartosc_zakupu), narzut_proc: Number(m.narzut_proc),
     })),
+    uslugi_obce: (z.uslugi_obce ?? []).map((u: any) => ({ ...u, wartosc_zakupu: Number(u.wartosc_zakupu), narzut_proc: Number(u.narzut_proc) })),
+    // Usługi obce bez skanu faktury - w SAP skan jest obowiązkowy.
+    bezSkanu: (z.uslugi_obce ?? []).filter((u: any) => !(z.zalaczniki ?? []).some((a: any) => a.typ === 'faktura_uslugi_obcej' && a.usluga_obca_id === u.id)).length,
   }
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -173,6 +178,12 @@ export function PanelEksportu({ otworz }: { otworz: (id: string) => void }) {
                         <span className="ml-2 rounded bg-amber-50 px-1.5 text-xs text-amber-800 ring-1 ring-amber-300"
                           title="Kierownik dodał pozycję spoza cennika - sprawdź opis, cenę i indeks SAP przed wklejeniem">
                           pozycja spoza cennika
+                        </span>
+                      )}
+                      {z.bezSkanu > 0 && (
+                        <span className="ml-2 rounded bg-amber-50 px-1.5 text-xs text-amber-800 ring-1 ring-amber-300"
+                          title="Usługa obca bez wgranego skanu faktury - skan jest obowiązkowy w SAP">
+                          brak skanu faktury ({z.bezSkanu})
                         </span>
                       )}
                       {wiersze.some((w) => w[0] === null) && (

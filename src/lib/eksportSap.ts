@@ -19,11 +19,13 @@
  *  4. "Pozostało" i "Nr Mat. dostawcy" zostają puste.
  *  5. Materiał dostarczony przez Synthos (narzut 0%) nie jest eksportowany - brak wartości
  *     do rozliczenia. Materiał od innego wpisanego dostawcy jest eksportowany normalnie.
+ *  7. Usługa obca: pozycja cennika "Usługa obca + 10%" (5001720, cena 1 zł/JD), więc - jak materiał -
+ *     Ilość = wartość z faktury z narzutem, Cena = 1, Krótki tekst = opis usługi.
  *  6. Pozycja spoza cennika: pusty "Numer linii" (Synthos nadaje go w SAP), indeks SAP
  *     jeśli kierownik go wpisał, opis/JM/cena wpisane ręcznie. Panel oznacza takie
  *     zlecenia do weryfikacji przez dział handlowy.
  */
-import { cenaJednMaterialu, cenaUslugi, czySynthos, grosze, wartoscMaterialu, wartoscUslugi } from './obliczenia'
+import { cenaJednMaterialu, cenaUslugi, czySynthos, grosze, wartoscMaterialu, wartoscUslugi, wartoscUslugiObcej } from './obliczenia'
 import type { Dostawca, PozycjaCennika } from './types'
 
 export const KOLUMNY_SAP = [
@@ -35,6 +37,7 @@ export type KomorkaSap = string | number | null
 export type WierszSap = [number | null, string, string, number, null, string, number, number, number | null, number | null, null]
 
 export const INDEKS_MATERIALU = '5004062'
+export const INDEKS_USLUGI_OBCEJ = '5001720'
 export const GRUPA_ROBOCIZNY = 310
 const MAKS_KROTKI_TEKST = 40
 
@@ -46,6 +49,17 @@ export interface ZlecenieDoEksportu {
   nazwa: string
   linia_uslugi?: number | null
   linia_materialy?: number | null
+  nr_azo?: string | null
+  konto?: string | null
+  uslugi_obce?: {
+    opis: string
+    wykonawca: string | null
+    numer_faktury: string | null
+    wartosc_zakupu: number
+    narzut_proc: number
+    nr_linii_sap: number | null
+    kolejnosc: number
+  }[]
   pozycje_uslug: {
     ilosc: number
     cena: number
@@ -114,6 +128,13 @@ export function wierszeSap(z: ZlecenieDoEksportu, materialy: MaterialWgKategorii
       mat?.jm ?? 'JD', 1, wartosc, cenaJednMaterialu(m), Number(m.ilosc), null,
     ])
   }
+  for (const u of [...(z.uslugi_obce ?? [])].sort((a, b) => a.kolejnosc - b.kolejnosc)) {
+    const wartosc = wartoscUslugiObcej(u)
+    wiersze.push([
+      u.nr_linii_sap ?? z.linia_uslugi ?? null, INDEKS_USLUGI_OBCEJ, u.opis.slice(0, MAKS_KROTKI_TEKST), wartosc, null,
+      'JD', 1, wartosc, null, null, null,
+    ])
+  }
   return wiersze
 }
 
@@ -177,6 +198,13 @@ export function wierszeSzczegolow(z: ZlecenieDoEksportu): (string | number | nul
       synthos ? 'Synthos' : m.dostawca === 'bioerg' ? 'Bioerg' : m.dostawca,
     ])
   }
+  for (const u of [...(z.uslugi_obce ?? [])].sort((a, b) => a.kolejnosc - b.kolejnosc)) {
+    const wartosc = wartoscUslugiObcej(u)
+    wynik.push([
+      nr, z.nazwa, z.mpk, 'Usługa obca', u.nr_linii_sap ?? z.linia_uslugi ?? null, INDEKS_USLUGI_OBCEJ, u.opis, 1, 'JD',
+      wartosc, wartosc, u.wartosc_zakupu, u.narzut_proc, grosze(wartosc - u.wartosc_zakupu), u.numer_faktury ?? '', u.wykonawca ?? '',
+    ])
+  }
   return wynik
 }
 
@@ -204,7 +232,7 @@ export async function plikXlsx(zlecenia: ZlecenieDoEksportu[], materialy: Materi
   const linie: (string | number | null)[][] = []
   const naglowkiBlokow: number[] = []
   const naglowkiKolumn: number[] = []
-  const zestawienie: (string | number)[][] = [['Nr zamówienia', 'MPK', 'Nazwa', 'Liczba linii', 'Wartość']]
+  const zestawienie: (string | number)[][] = [['Nr zamówienia', 'Nr AZO', 'Konto', 'MPK', 'Nazwa', 'Liczba linii', 'Wartość']]
   const arkusze: { nazwa: string; ws: Arkusz }[] = []
   const uzyte = new Set<string>(['Linie SAP', 'Szczegóły', 'Zestawienie'])
   let razem = 0
@@ -219,7 +247,7 @@ export async function plikXlsx(zlecenia: ZlecenieDoEksportu[], materialy: Materi
     linie.push([...KOLUMNY_SAP])
     linie.push(...wiersze)
     linie.push([])
-    zestawienie.push([etykietaZamowienia(z), z.mpk, z.nazwa, wiersze.length, suma])
+    zestawienie.push([etykietaZamowienia(z), z.nr_azo ?? '', z.konto ?? '', z.mpk, z.nazwa, wiersze.length, suma])
 
     const ws = XLSX.utils.aoa_to_sheet([[...KOLUMNY_SAP], ...wiersze])
     ws['!cols'] = [8, 12, 42, 10, 10, 10, 10, 12, 10, 10, 14].map((wch) => ({ wch }))
@@ -231,7 +259,7 @@ export async function plikXlsx(zlecenia: ZlecenieDoEksportu[], materialy: Materi
     uzyte.add(nazwa)
     arkusze.push({ nazwa, ws })
   }
-  zestawienie.push(['RAZEM', '', '', '', grosze(razem)])
+  zestawienie.push(['RAZEM', '', '', '', '', '', grosze(razem)])
 
   const wsL = XLSX.utils.aoa_to_sheet(linie)
   wsL['!cols'] = [8, 12, 42, 10, 10, 10, 10, 12, 10, 10, 14].map((wch) => ({ wch }))
@@ -248,9 +276,9 @@ export async function plikXlsx(zlecenia: ZlecenieDoEksportu[], materialy: Materi
 
   // 3. Zestawienie
   const wsZ = XLSX.utils.aoa_to_sheet(zestawienie)
-  wsZ['!cols'] = [16, 6, 50, 12, 14].map((wch) => ({ wch }))
-  styluj(wsZ, 0, 5, STYL_NAGLOWKA)
-  styluj(wsZ, zestawienie.length - 1, 5, { font: { bold: true } })
+  wsZ['!cols'] = [16, 16, 16, 6, 50, 12, 14].map((wch) => ({ wch }))
+  styluj(wsZ, 0, 7, STYL_NAGLOWKA)
+  styluj(wsZ, zestawienie.length - 1, 7, { font: { bold: true } })
   XLSX.utils.book_append_sheet(wb, wsZ, 'Zestawienie')
 
   // 4. Arkusz na zamówienie

@@ -5,10 +5,10 @@ import { useSlowniki } from '@/lib/slowniki'
 import { komunikatPL } from '@/lib/config'
 import { ETYKIETY_BRAKU, ETYKIETY_STATUSU, KOLORY_STATUSU, dataGodzinaPL, zl } from '@/lib/format'
 import { czySynthos, grosze, nowyKlucz, policzSumy, wartoscMaterialu } from '@/lib/obliczenia'
-import { SZABLONY, brakiKarty, szablon } from '@/lib/szablony'
+import { SZABLONY, brakiKarty, parametrySilnika, szablon } from '@/lib/szablony'
 import { KOLUMNY_SAP, etykietaZamowienia, plikXlsx, pobierz, tekstDoSchowka, wierszeSap, type ZlecenieDoEksportu } from '@/lib/eksportSap'
 import type {
-  BrakGodzin, KartaRemontowa, PozycjaMaterialowa, PozycjaUslugi, Profil, StatusZlecenia, Zlecenie,
+  BrakGodzin, KartaRemontowa, PozycjaMaterialowa, PozycjaUslugi, Profil, StatusZlecenia, Zlecenie, UslugaObca, Zalacznik,
 } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Button } from './ui/button'
@@ -18,7 +18,8 @@ import { PoleWyboru } from './PoleWyboru'
 import { SiatkaRobocizny } from './zlecenie/SiatkaRobocizny'
 import { PozycjeCennikowe } from './zlecenie/PozycjeCennikowe'
 import { TabelaMaterialow } from './zlecenie/TabelaMaterialow'
-import { KartyRemontowe } from './zlecenie/KartyRemontowe'
+import { TabelaUslugObcych } from './zlecenie/TabelaUslugObcych'
+import { KartyRemontowe, type SilnikZPozycji } from './zlecenie/KartyRemontowe'
 
 interface Props {
   /** null = nowe zlecenie, 'kopia:<uuid>' = nowe na wzór istniejącego, uuid = edycja */
@@ -50,6 +51,7 @@ interface Stan {
   materialy: PozycjaMaterialowa[]
   karty: KartaRemontowa[]
   braki: BrakGodzin[]
+  uslugiObce: UslugaObca[]
 }
 
 interface Historia {
@@ -96,6 +98,10 @@ function zBazy(z: any): Stan {
     braki: [...(z.braki_godzin ?? [])].sort((a: any, b: any) => a.id - b.id).map((b: any) => ({
       id: b.id, klucz: `b${b.id}`, cennik_pozycja_id: b.cennik_pozycja_id, stanowisko_tekst: b.stanowisko_tekst, ilosc_rbg: Number(b.ilosc_rbg), status: b.status, opis: b.opis,
     })),
+    uslugiObce: [...(z.uslugi_obce ?? [])].sort((a: any, b: any) => a.kolejnosc - b.kolejnosc || a.id - b.id).map((u: any) => ({
+      id: u.id, klucz: `o${u.id}`, opis: u.opis, wykonawca: u.wykonawca, numer_faktury: u.numer_faktury,
+      wartosc_zakupu: Number(u.wartosc_zakupu), narzut_proc: Number(u.narzut_proc), nr_linii_sap: u.nr_linii_sap,
+    })),
   }
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -111,7 +117,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
   const nowe = !idZrodla || kopia
   const mpkDomyslne = profil.mpk[0] ?? 'P04'
 
-  const [stan, setStan] = useState<Stan>({ naglowek: pustyNaglowek(mpkDomyslne), uslugi: [], materialy: [], karty: [], braki: [] })
+  const [stan, setStan] = useState<Stan>({ naglowek: pustyNaglowek(mpkDomyslne), uslugi: [], materialy: [], karty: [], braki: [], uslugiObce: [] })
   const [zapisany, setZapisany] = useState<string>('')
   const [meta, setMeta] = useState<Pick<Zlecenie, 'status' | 'komentarz_handlowca' | 'zmodyfikowano' | 'zlozono' | 'wyeksportowano' | 'zakonczono'> | null>(null)
   const [historia, setHistoria] = useState<Historia>({ zamowienia: [], konta: [], mechanicy: [], numeryKart: [] })
@@ -128,14 +134,28 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
   const status: StatusZlecenia = meta?.status ?? 'roboczy'
   const zamkniete = status === 'wyeksportowany' || status === 'zakonczony'
   const edycja = nowe || (handlowiec ? !zamkniete : status === 'roboczy' || status === 'zwrocony')
-  const { naglowek, uslugi, materialy, karty, braki } = stan
+  const { naglowek, uslugi, materialy, karty, braki, uslugiObce } = stan
+  const [zalaczniki, setZalaczniki] = useState<Zalacznik[]>([])
+  // Nr AZO wpisuje dział handlowy niezależnie od formularza - także po eksporcie do SAP.
+  const [nrAzo, setNrAzo] = useState('')
+  const [nrAzoZapisany, setNrAzoZapisany] = useState('')
+  const idZapisanego = nowe ? null : idZrodla
+  const mozeDodacZalacznik = !!idZapisanego && (handlowiec || edycja)
+
+  const odswiezZalaczniki = useCallback(async () => {
+    if (!idZapisanego) return
+    const { data } = await supabase.from('zalaczniki').select('*').eq('zlecenie_id', idZapisanego).order('utworzono')
+    setZalaczniki((data ?? []) as Zalacznik[])
+  }, [idZapisanego])
+
+  useEffect(() => { void odswiezZalaczniki() }, [odswiezZalaczniki])
   const zmieniony = JSON.stringify(stan) !== zapisany
 
   const wczytaj = useCallback(async (id: string) => {
     setLadowanie(true)
     const { data, error } = await supabase
       .from('zlecenia')
-      .select('*, pozycje_uslug(*), pozycje_materialowe(*), karty_remontowe(*), braki_godzin(*)')
+      .select('*, pozycje_uslug(*), pozycje_materialowe(*), karty_remontowe(*), braki_godzin(*), uslugi_obce(*)')
       .eq('id', id)
       .maybeSingle()
     setLadowanie(false)
@@ -150,7 +170,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
       const nowy: Stan = {
         naglowek: { ...s.naglowek, nr_zamowienia: '', pozycja_zamowienia: '', linia_uslugi: '', linia_materialy: '', data_przyjecia: '', data_zakonczenia: '', uwagi: '' },
         uslugi: s.uslugi.map((u) => ({ ...u, id: undefined, cena: undefined, nr_linii_sap: null, klucz: nowyKlucz() })),
-        materialy: [], karty: [], braki: [],
+        materialy: [], karty: [], braki: [], uslugiObce: [],
       }
       setStan(nowy)
       setZapisany('')
@@ -158,6 +178,8 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
     }
     setStan(s)
     setZapisany(JSON.stringify(s))
+    setNrAzo(data.nr_azo ?? '')
+    setNrAzoZapisany(data.nr_azo ?? '')
     setMeta({
       status: data.status, komentarz_handlowca: data.komentarz_handlowca, zmodyfikowano: data.zmodyfikowano,
       zlozono: data.zlozono, wyeksportowano: data.wyeksportowano, zakonczono: data.zakonczono,
@@ -199,7 +221,16 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
   const ustaw = <K extends keyof Stan>(klucz: K) => (wartosc: Stan[K]) => setStan((s) => ({ ...s, [klucz]: wartosc }))
   const ustawNaglowek = (zmiana: Partial<Naglowek>) => setStan((s) => ({ ...s, naglowek: { ...s.naglowek, ...zmiana } }))
 
-  const sumy = useMemo(() => policzSumy(uslugi, materialy, cennik), [uslugi, materialy, cennik])
+  const sumy = useMemo(() => policzSumy(uslugi, materialy, cennik, uslugiObce), [uslugi, materialy, cennik, uslugiObce])
+  const kartWSkanach = zalaczniki.filter((z) => z.typ === 'karta_remontowa').reduce((s, z) => s + z.liczba_kart, 0)
+
+  // Silniki z pozycji cennika (po jednym na sztukę) - źródło mocy/napięcia/obrotów dla kart silników.
+  const silniki = useMemo<SilnikZPozycji[]>(() => uslugi.flatMap((u) => {
+    const p = u.cennik_pozycja_id === null ? undefined : cennik.get(u.cennik_pozycja_id)
+    const param = p ? parametrySilnika(p.opis) : {}
+    if (!p || !param.moc_kw) return []
+    return Array.from({ length: Math.max(1, Math.ceil(u.ilosc)) }, () => ({ opis: p.opis, ...param }))
+  }), [uslugi, cennik])
 
   const wymaganeKarty = useMemo(() => Math.ceil(uslugi.reduce((s, u) => {
     const p = u.cennik_pozycja_id === null ? undefined : cennik.get(u.cennik_pozycja_id)
@@ -230,15 +261,16 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
     const mat = bezPustychMaterialow(materialy)
     if (mat.some((m) => !m.nazwa.trim())) return 'Uzupełnij nazwę materiału we wszystkich wierszach (albo usuń puste wiersze).'
     if (mat.some((m) => !(m.ilosc > 0))) return 'Ilość materiału musi być większa od zera.'
+    if (uslugiObce.some((u) => u.wartosc_zakupu > 0 && !u.opis.trim())) return 'Wpisz opis usługi obcej (albo usuń pusty wiersz).'
     if (mat.some((m) => !m.dostawca.trim())) return 'Wpisz, kto dostarczył materiał (albo wybierz Bioerg / Synthos).'
     return null
   }
 
   function bledyZlozenia(): string | null {
     if (!naglowek.nr_zamowienia.trim()) return 'Wpisz numer zamówienia SAP - bez niego nie da się rozliczyć zlecenia.'
-    if (!uslugi.some((u) => u.ilosc > 0) && !bezPustychMaterialow(materialy).length) return 'Zlecenie nie ma żadnych pozycji do rozliczenia.'
-    if (karty.length < wymaganeKarty) {
-      return `Pozycje cennikowe wymagają ${wymaganeKarty} kart remontowych, a jest ${karty.length}. Uzupełnij karty w sekcji „Karty remontowe”.`
+    if (!uslugi.some((u) => u.ilosc > 0) && !bezPustychMaterialow(materialy).length && !uslugiObce.some((u) => u.opis.trim())) return 'Zlecenie nie ma żadnych pozycji do rozliczenia.'
+    if (karty.length + kartWSkanach < wymaganeKarty) {
+      return `Pozycje cennikowe wymagają ${wymaganeKarty} kart remontowych, a jest ${karty.length + kartWSkanach}. Wypełnij karty, wgraj skan karty (PDF) albo odznacz „Karta” przy pozycji.`
     }
     const niepelne = karty.map((k, i) => ({ i, braki: brakiKarty(k) })).filter((x) => x.braki.length)
     if (niepelne.length) return `Karta ${niepelne[0].i + 1} jest niekompletna - brakuje: ${niepelne[0].braki.join(', ')}.`
@@ -257,6 +289,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
       materialy: bezPustychMaterialow(materialy).map((m, i) => ({ ...m, kolejnosc: i })),
       karty,
       braki: braki.filter((b) => b.ilosc_rbg > 0),
+      uslugi_obce: uslugiObce.filter((u) => u.opis.trim() || u.wartosc_zakupu > 0).map((u, i) => ({ ...u, kolejnosc: i })),
     }
     const { data, error } = await supabase.rpc('zapisz_zlecenie', {
       p, p_oczekiwana_wersja: nowe ? null : meta?.zmodyfikowano ?? null,
@@ -293,6 +326,21 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
     if (nowe) { otworzInne(id); return }
     await wczytaj(id)
     setKomunikat('Zlecenie złożone do rozliczenia. Dział handlowy je zobaczy.')
+  }
+
+  async function zapiszAzo() {
+    if (!idZapisanego) return
+    setZajety(true)
+    const wartosc = nrAzo.trim() || null
+    const { error } = await supabase.from('zlecenia').update({ nr_azo: wartosc }).eq('id', idZapisanego)
+    setZajety(false)
+    if (error) { setBlad(komunikatPL(error.message)); return }
+    setNrAzo(wartosc ?? '')
+    setNrAzoZapisany(wartosc ?? '')
+    // Zmiana nr AZO podbija wersję zlecenia - wczytujemy ją, żeby kolejny zapis formularza nie zgłosił konfliktu.
+    const { data } = await supabase.from('zlecenia').select('zmodyfikowano').eq('id', idZapisanego).maybeSingle()
+    if (data) setMeta((m) => (m ? { ...m, zmodyfikowano: data.zmodyfikowano } : m))
+    setKomunikat('Zapisano nr AZO.')
   }
 
   async function zwroc() {
@@ -405,9 +453,11 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
           }
         }),
       pozycje_materialowe: bezPustychMaterialow(materialy).map((m, i) => ({ ...m, kolejnosc: i })),
+      uslugi_obce: uslugiObce.filter((u) => u.opis.trim()).map((u, i) => ({ ...u, kolejnosc: i })),
+      nr_azo: nrAzo || null, konto: naglowek.konto || null,
     }
     return z
-  }, [idZrodla, naglowek, uslugi, materialy, cennik])
+  }, [idZrodla, naglowek, uslugi, materialy, uslugiObce, nrAzo, cennik])
   const podgladSap = useMemo(() => wierszeSap(doEksportu, materialWgKategorii), [doEksportu, materialWgKategorii])
 
   async function pobierzXlsx() {
@@ -506,6 +556,21 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
             <input className="pole" disabled={!edycja} value={naglowek.linia_materialy} placeholder="np. 20" inputMode="numeric"
               onChange={(e) => ustawNaglowek({ linia_materialy: e.target.value.trim() })} />
           </label>
+          <div className="block">
+            <span className="etykieta">Nr AZO <span className="font-normal text-slate-400">(uzupełnia dział handlowy)</span></span>
+            {handlowiec && !nowe ? (
+              <div className="flex gap-1">
+                <input className="pole font-mono" value={nrAzo} placeholder="z Optimy" onChange={(e) => setNrAzo(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void zapiszAzo() }} />
+                {nrAzo.trim() !== nrAzoZapisany && (
+                  <button className="rounded-md bg-limonka px-2 text-xs font-medium hover:bg-limonka-ciemna hover:text-white" disabled={zajety}
+                    onClick={() => void zapiszAzo()}>Zapisz</button>
+                )}
+              </div>
+            ) : (
+              <input className="pole font-mono" disabled value={nrAzo} placeholder={nowe ? 'po zapisaniu zlecenia' : ''} />
+            )}
+          </div>
           <label className="block">
             <span className="etykieta">Konto</span>
             <input className="pole" list="hist-konta" disabled={!edycja} value={naglowek.konto} placeholder="URR/1/2026/BZ"
@@ -556,10 +621,17 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
       </section>
 
       <section className="sekcja">
+        <h3 className="mb-3 font-semibold">Usługi obce <span className="font-normal text-slate-500">(praca zlecona firmie zewnętrznej, refakturowana z narzutem)</span></h3>
+        <TabelaUslugObcych uslugi={uslugiObce} ustaw={ustaw('uslugiObce')} edycja={edycja} zlecenieId={idZapisanego}
+          zalaczniki={zalaczniki} mozeDodacZalacznik={mozeDodacZalacznik} odswiezZalaczniki={odswiezZalaczniki} />
+      </section>
+
+      <section className="sekcja">
         <h3 className="mb-3 font-semibold">Karty remontowe</h3>
         <KartyRemontowe karty={karty} ustaw={ustaw('karty')} wymagane={wymaganeKarty} szablonZlecenia={naglowek.szablon}
           nazwaZlecenia={naglowek.nazwa} mechanik={naglowek.mechanik} numerKarty={numerKarty} edycja={edycja}
-          pdf={(k) => void pobierzPdf(k)} />
+          pdf={(k) => void pobierzPdf(k)} skany={zalaczniki.filter((z) => z.typ === 'karta_remontowa')} zlecenieId={idZapisanego}
+          mozeDodacZalacznik={mozeDodacZalacznik} odswiezZalaczniki={odswiezZalaczniki} silniki={silniki} />
       </section>
 
       <section className="sekcja">
@@ -684,6 +756,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
           <span>Robocizna: <strong className="tabular-nums">{zl(sumy.robocizna)}</strong></span>
           <span>Cennik: <strong className="tabular-nums">{zl(sumy.cennik)}</strong></span>
           <span>Materiały: <strong className="tabular-nums">{zl(sumy.materialy)}</strong></span>
+          {sumy.uslugiObce > 0 && <span>Usługi obce: <strong className="tabular-nums">{zl(sumy.uslugiObce)}</strong></span>}
           <span className="text-base">Razem: <strong className="tabular-nums">{zl(sumy.razem)} zł</strong></span>
           {blad && <span className="rounded bg-red-50 px-2 py-1 text-red-700">{blad}</span>}
           {komunikat && !blad && <span className="rounded bg-limonka-jasna px-2 py-1 text-limonka-ciemna">{komunikat}</span>}

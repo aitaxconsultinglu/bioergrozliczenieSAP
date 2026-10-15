@@ -96,10 +96,17 @@ export function Instrukcja({ profil }: { profil: Profil }) {
               Narzut (domyślnie 12%) i wartość z narzutem liczą się automatycznie i są widoczne w osobnych kolumnach. Enter w ostatniej kolumnie dodaje wiersz.</p>
             <p><strong>Dostarczył</strong>: Bioerg, <strong>Synthos (narzut 0%, nie idzie do rozliczenia)</strong> albo „inne (wpisz)”, np. „z demontażu”. Przy innym dostawcy narzut ustawiasz sam.</p>
           </Krok>
+          <Krok nr="5a" tytul="Usługi obce">
+            <p>Praca zlecona firmie zewnętrznej (np. wyważanie, regeneracja): opis, wykonawca, nr faktury i wartość netto z faktury.
+              Narzut <strong>10%</strong> liczy się sam; w SAP pozycja „Usługa obca + 10%”. Po zapisaniu zlecenia przy każdej usłudze wgraj <strong>skan faktury</strong>
+              (w SAP jest obowiązkowy) - wiersze bez skanu są podświetlone.</p>
+          </Krok>
           <Krok nr={6} tytul="Karty remontowe">
             <p>Pompy, przekładnie i silniki z umowy wymagają karty remontowej, <strong>jednej na każdą sztukę</strong>. Aplikacja pokazuje, ile kart brakuje.
               Przycisk <strong>„Dodaj brakujące karty”</strong> tworzy je z podpowiedzianym numerem KR.</p>
             <p>Pola z czerwoną gwiazdką są obowiązkowe. Zakres remontu zaznaczasz na liście, a czynności spoza listy wpisujesz w polu „Inne czynności”.</p>
+            <p>Kartę wypełnioną odręcznie na stanowisku remontu wystarczy <strong>wgrać jako skan (PDF lub zdjęcie)</strong> w części „Skan karty remontowej” - liczy się jak wypełniona karta.
+              Jeśli w jednym pliku jest kilka kart, ustaw ich liczbę. Przy silnikach elektrycznych moc, napięcie i obroty uzupełniają się same z indeksu silnika z cennika.</p>
             <p>Przycisk <strong>PDF</strong> przy karcie pobiera ją jako plik do załączenia w Synthosie. „PDF wszystkich kart” daje jeden plik z kartami całego zlecenia.</p>
           </Krok>
           <Krok nr={7} tytul="Braki godzin">
@@ -138,6 +145,10 @@ export function Instrukcja({ profil }: { profil: Profil }) {
             <Krok nr={3} tytul="Oznacz jako wyeksportowane">
               <p>Po wprowadzeniu do SAP zaznacz zlecenia i kliknij <strong>„Oznacz jako wyeksportowane”</strong>. Znikną z listy i będą zablokowane, więc nic nie zostanie wklejone dwa razy.
                 Pomyłka? Otwórz zlecenie i kliknij <strong>„Cofnij eksport”</strong>. „Ostatnie eksporty” pozwalają pobrać dawny plik ponownie.</p>
+            </Krok>
+            <Krok nr="3a" tytul="Nr AZO i wyszukiwanie">
+              <p>Po wygenerowaniu AZO w Optimie wpisz jego numer w zleceniu w polu <strong>„Nr AZO”</strong> i kliknij „Zapisz” - działa na każdym etapie, także po eksporcie i zakończeniu.
+                Na liście zleceń są kolumny Nr AZO i Konto: wyszukasz po nich zrealizowane zamówienia i posortujesz listę.</p>
             </Krok>
             <Krok nr={4} tytul="Poprawki">
               <p><strong>„Zakończony”</strong> - ostatni status, gdy zlecenie jest już rozliczone. Ustawisz go przyciskiem „Zakończ” w wyeksportowanym zleceniu

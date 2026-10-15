@@ -53,9 +53,16 @@ export function TabelaMaterialow({ materialy, ustaw, edycja }: Props) {
     ustaw(materialy.map((x) => (x === m ? { ...x, ...zmiana } : x)))
 
   // Zmiana ilości zachowuje cenę jednostkową (jak na fakturze): wartość = cena × nowa ilość.
+  // Cena zakupu za JM: zapamiętana w wierszu albo wyliczona z wartości (dla wierszy wczytanych z bazy).
+  const cenaZakupu = (m: PozycjaMaterialowa) =>
+    m.cena_zakupu !== undefined ? m.cena_zakupu : m.ilosc > 0 ? grosze(m.wartosc_zakupu / m.ilosc) : 0
+
+  // Zmiana ilości zachowuje cenę jednostkową (jak na fakturze): wartość = cena × nowa ilość.
+  // Cena jest trzymana osobno, bo przy wpisywaniu "0,5" ilość chwilowo wynosi 0 - wcześniej
+  // cena liczona jako wartość/ilość ginęła wtedy bezpowrotnie (zgłoszenie: pół puszki emalii).
   const zmienIlosc = (m: PozycjaMaterialowa, n: number) => {
-    const cena = m.ilosc > 0 ? m.wartosc_zakupu / m.ilosc : 0
-    zmien(m, { ilosc: n, wartosc_zakupu: cena > 0 ? grosze(cena * n) : m.wartosc_zakupu })
+    const cena = cenaZakupu(m)
+    zmien(m, { ilosc: n, cena_zakupu: cena, wartosc_zakupu: cena > 0 ? grosze(cena * n) : m.wartosc_zakupu })
   }
 
   const dodajPrzyEnter = (i: number): React.KeyboardEventHandler => (e) => {
@@ -104,6 +111,7 @@ export function TabelaMaterialow({ materialy, ustaw, edycja }: Props) {
                         nazwa: z.nazwa,
                         jm: z.jm || m.jm,
                         wartosc_zakupu: grosze(z.cena_jedn * (m.ilosc || 1)),
+                        cena_zakupu: z.cena_jedn,
                         ilosc: m.ilosc || 1,
                         numer_faktury: z.numer_faktury,
                       })}
@@ -117,12 +125,12 @@ export function TabelaMaterialow({ materialy, ustaw, edycja }: Props) {
                       onChange={(e) => zmien(m, { jm: e.target.value })} />
                   </td>
                   <td className="komorka p-0">
-                    <PoleLiczby wartosc={m.ilosc > 0 ? grosze(m.wartosc_zakupu / m.ilosc) : 0} disabled={!edycja} aria-label="Cena zakupu za jednostkę"
-                      zmien={(c) => zmien(m, { wartosc_zakupu: grosze(c * (m.ilosc || 1)) })} />
+                    <PoleLiczby wartosc={cenaZakupu(m)} disabled={!edycja} aria-label="Cena zakupu za jednostkę"
+                      zmien={(c) => zmien(m, { cena_zakupu: c, wartosc_zakupu: grosze(c * m.ilosc) })} />
                   </td>
                   <td className="komorka p-0">
                     <PoleLiczby wartosc={m.wartosc_zakupu} disabled={!edycja} aria-label="Wartość zakupu"
-                      zmien={(n) => zmien(m, { wartosc_zakupu: n })} />
+                      zmien={(n) => zmien(m, { wartosc_zakupu: n, cena_zakupu: m.ilosc > 0 ? grosze(n / m.ilosc) : m.cena_zakupu })} />
                   </td>
                   <td className="komorka p-0">
                     <PoleWyboru wKomorce disabled={!edycja} aria-label="Dostarczył" opcje={DOSTAWCY} wartosc={m.dostawca}

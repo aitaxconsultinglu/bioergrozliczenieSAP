@@ -11,8 +11,9 @@ import type { Profil } from '@/lib/types'
  * karty remontowej i jakiego szablonu - to steruje walidacją bez zmian w kodzie.
  */
 export function Cennik({ profil }: { profil: Profil }) {
-  const { pozycje, kategorie, odswiez, narzutDomyslny } = useSlowniki()
+  const { pozycje, kategorie, odswiez, narzutDomyslny, narzutUslugObcych } = useSlowniki()
   const [narzut, setNarzut] = useState(String(narzutDomyslny))
+  const [narzutObce, setNarzutObce] = useState(String(narzutUslugObcych))
   const [fraza, setFraza] = useState('')
   const [kategoria, setKategoria] = useState<number | ''>('')
   const [blad, setBlad] = useState<string | null>(null)
@@ -36,9 +37,9 @@ export function Cennik({ profil }: { profil: Profil }) {
 
   const kat = kategoria === '' ? null : kategorie.get(kategoria)
 
-  async function zapiszNarzut(n: number) {
+  async function zapiszNarzut(n: number, klucz = 'narzut_material_proc') {
     if (!Number.isFinite(n) || n < 0 || n > 100) { setBlad('Narzut musi być liczbą od 0 do 100.'); return }
-    const { error } = await supabase.from('ustawienia').update({ wartosc: n }).eq('klucz', 'narzut_material_proc')
+    const { error } = await supabase.from('ustawienia').update({ wartosc: n }).eq('klucz', klucz)
     if (error) { setBlad(komunikatPL(error.message)); return }
     setBlad(null)
     await odswiez()
@@ -64,6 +65,19 @@ export function Cennik({ profil }: { profil: Profil }) {
             <span className="text-xs text-slate-500">Dotyczy nowo dodawanych materiałów. W pojedynczym wierszu narzut można zmienić ręcznie.</span>
           </>
         ) : <strong>{narzutDomyslny}%</strong>}
+      </div>
+
+      <div className="sekcja flex flex-wrap items-center gap-3 text-sm">
+        <span>Domyślny narzut na usługi obce:</span>
+        {handlowiec ? (
+          <>
+            <input className="pole w-20 text-right" inputMode="decimal" value={narzutObce} aria-label="Domyślny narzut na usługi obce %"
+              onChange={(e) => setNarzutObce(e.target.value)} />
+            <span>%</span>
+            <button className="rounded-md bg-limonka px-3 py-1.5 font-medium hover:bg-limonka-ciemna hover:text-white"
+              onClick={() => void zapiszNarzut(Number(narzutObce.replace(',', '.')), 'narzut_uslugi_obce_proc')}>Zapisz</button>
+          </>
+        ) : <strong>{narzutUslugObcych}%</strong>}
       </div>
 
       <div className="flex flex-wrap gap-3">

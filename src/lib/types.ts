@@ -56,6 +56,7 @@ export interface Zlecenie {
   status: StatusZlecenia
   linia_uslugi: number | null
   linia_materialy: number | null
+  nr_azo: string | null
   uwagi: string | null
   komentarz_handlowca: string | null
   utworzono: string
@@ -97,6 +98,34 @@ export interface PozycjaMaterialowa {
   dostawca: Dostawca
   narzut_proc: number
   numer_faktury: string | null
+  /** Tylko w formularzu: cena zakupu za JM - trzymana osobno, żeby nie zginęła, gdy ilość chwilowo = 0 (np. przy wpisywaniu „0,5”). */
+  cena_zakupu?: number
+}
+
+/** Usługa obca (np. wyważanie zlecone firmie zewnętrznej) - sprzedawana z narzutem, w SAP pod „Usługa obca + 10%”. */
+export interface UslugaObca {
+  id?: number
+  klucz: string
+  opis: string
+  wykonawca: string | null
+  numer_faktury: string | null
+  wartosc_zakupu: number
+  narzut_proc: number
+  nr_linii_sap: number | null
+}
+
+export type TypZalacznika = 'karta_remontowa' | 'faktura_uslugi_obcej' | 'inne'
+
+export interface Zalacznik {
+  id: string
+  zlecenie_id: string
+  typ: TypZalacznika
+  usluga_obca_id: number | null
+  liczba_kart: number
+  nazwa_pliku: string
+  sciezka: string
+  rozmiar: number | null
+  utworzono: string
 }
 
 export interface KartaRemontowa {

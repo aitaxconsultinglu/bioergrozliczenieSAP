@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { cenaJednMaterialu, cenaUslugi, czySynthos, grosze, wartoscMaterialu, wartoscUslugi } from './obliczenia'
 import { maPozycjeSpozaCennika, tekstDoSchowka, wierszeSap, wierszeSzczegolow, type ZlecenieDoEksportu } from './eksportSap'
 import type { PozycjaCennika } from './types'
+import { parametrySilnika } from './szablony'
 
 describe('grosze', () => {
   it('zaokrągla połówki w górę mimo szumu binarnego (jak Excel)', () => {
@@ -109,5 +110,21 @@ describe('arkusz Szczegóły w XLSX', () => {
     expect(w[0].slice(3, 4)).toEqual(['Robocizna wg rbg'])
     expect(w[1]).toEqual(['4200112773', 'POMPA', 'P04', 'Materiał', 20, '5004062', 'ŁOŻYSKO TEST', 1, 'szt',
       82.78, 82.78, 73.91, 12, 8.87, 'PZ/1/01/2026', 'Bioerg'])
+  })
+})
+
+describe('parametry silnika z indeksu', () => {
+  it('rozpoznaje moc, napięcie i obroty z opisu cennika', () => {
+    expect(parametrySilnika('R-t siln 400/500V 7,5 kW 1400 obr/min')).toEqual({ moc_kw: '7,5', napiecie_v: '400/500', obroty: '1400' })
+    expect(parametrySilnika('R-t siln 400/500V 4-4,1 kW 700-900 o/min')).toEqual({ moc_kw: '4-4,1', napiecie_v: '400/500', obroty: '700-900' })
+    expect(parametrySilnika('R-t siln 400/500V 0,37 kW 700-900 ob/min')).toEqual({ moc_kw: '0,37', napiecie_v: '400/500', obroty: '700-900' })
+    expect(parametrySilnika('Wym silnika el na stan pracy 5,5 kW')).toEqual({ moc_kw: '5,5' })
+    expect(parametrySilnika('Remont pompy typ 3X9K')).toEqual({})
+  })
+  it('usługa obca: 500 zł + 10% = 550 zł, w SAP pod 5001720 z ceną 1', () => {
+    const w = wierszeSap({ id: 'u', mpk: 'P04', nr_zamowienia: '1', pozycja_zamowienia: null, nazwa: 'x', linia_uslugi: 10,
+      pozycje_uslug: [], pozycje_materialowe: [],
+      uslugi_obce: [{ opis: 'Wyważanie wirnika', wykonawca: 'Firma X', numer_faktury: 'FV 1', wartosc_zakupu: 500, narzut_proc: 10, nr_linii_sap: null, kolejnosc: 0 }] }, new Map())
+    expect(w).toEqual([[10, '5001720', 'Wyważanie wirnika', 550, null, 'JD', 1, 550, null, null, null]])
   })
 })

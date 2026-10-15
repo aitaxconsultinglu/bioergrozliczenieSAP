@@ -1,4 +1,4 @@
-import type { PozycjaCennika, PozycjaMaterialowa, PozycjaUslugi } from './types'
+import type { PozycjaCennika, PozycjaMaterialowa, PozycjaUslugi, UslugaObca } from './types'
 
 /**
  * Zaokrąglenie do groszy (połówki w górę, jak ZAOKR w Excelu) - każda wartość pokazana
@@ -39,10 +39,16 @@ export function czySynthos(dostawca: string | null | undefined) {
   return /synthos/i.test(dostawca ?? '')
 }
 
+/** Usługa obca: wartość netto z faktury + narzut (domyślnie 10%). */
+export function wartoscUslugiObcej(u: Pick<UslugaObca, 'wartosc_zakupu' | 'narzut_proc'>) {
+  return grosze(u.wartosc_zakupu * (1 + (u.narzut_proc || 0) / 100))
+}
+
 export interface Sumy {
   robocizna: number
   cennik: number
   materialy: number
+  uslugiObce: number
   razem: number
 }
 
@@ -50,6 +56,7 @@ export function policzSumy(
   uslugi: Pick<PozycjaUslugi, 'cennik_pozycja_id' | 'ilosc' | 'doplata_proc' | 'cena' | 'wlasna_cena'>[],
   materialy: Pick<PozycjaMaterialowa, 'wartosc_zakupu' | 'narzut_proc' | 'dostawca'>[],
   cennik: Map<number, PozycjaCennika>,
+  uslugiObce: Pick<UslugaObca, 'wartosc_zakupu' | 'narzut_proc'>[] = [],
 ): Sumy {
   let robocizna = 0
   let pozycjeCennikowe = 0
@@ -67,11 +74,13 @@ export function policzSumy(
     else pozycjeCennikowe += w
   }
   const mat = materialy.filter((m) => !czySynthos(m.dostawca)).reduce((s, m) => s + wartoscMaterialu(m), 0)
+  const obce = uslugiObce.reduce((s, u) => s + wartoscUslugiObcej(u), 0)
   return {
     robocizna: grosze(robocizna),
     cennik: grosze(pozycjeCennikowe),
     materialy: grosze(mat),
-    razem: grosze(robocizna + pozycjeCennikowe + mat),
+    uslugiObce: grosze(obce),
+    razem: grosze(robocizna + pozycjeCennikowe + mat + obce),
   }
 }
 

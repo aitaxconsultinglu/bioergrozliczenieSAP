@@ -178,3 +178,25 @@ export function brakiKarty(k: {
   }
   return braki
 }
+
+export interface ParametrySilnika {
+  moc_kw?: string
+  napiecie_v?: string
+  obroty?: string
+}
+
+/**
+ * Parametry silnika z opisu pozycji cennika, np. "R-t siln 400/500V 7,5 kW 1400 obr/min"
+ * -> { napiecie_v: '400/500', moc_kw: '7,5', obroty: '1400' }. Brakujące części po prostu pomija
+ * (np. "Wym silnika el na stan pracy 5,5 kW" daje tylko moc).
+ */
+export function parametrySilnika(opis: string): ParametrySilnika {
+  const wynik: ParametrySilnika = {}
+  const moc = /(\d+(?:[.,]\d+)?(?:\s*-\s*\d+(?:[.,]\d+)?)?)\s*kW/i.exec(opis)
+  if (moc) wynik.moc_kw = moc[1].replace(/\s/g, '')
+  const nap = /(\d{2,4}(?:\/\d{2,4})?)\s*V\b/.exec(opis)
+  if (nap) wynik.napiecie_v = nap[1]
+  const obr = /(\d{2,5}(?:\s*-\s*\d{2,5})?)\s*(?:obr|ob|o)\s*\/\s*min/i.exec(opis)
+  if (obr) wynik.obroty = obr[1].replace(/\s/g, '')
+  return wynik
+}

@@ -12,6 +12,8 @@ interface Slowniki {
   materialWgKategorii: MaterialWgKategorii
   /** Domyślny narzut na materiał [%] - ustawienie zmieniane przez dział handlowy. */
   narzutDomyslny: number
+  /** Domyślny narzut na usługi obce [%] (obecnie 10%). */
+  narzutUslugObcych: number
   gotowe: boolean
   blad: string | null
   odswiez: () => Promise<void>
@@ -41,6 +43,7 @@ export function DostawcaSlownikow({ children }: { children: ReactNode }) {
   const [stawki, setStawki] = useState<Stawka[]>([])
   const [mpk, setMpk] = useState<{ kod: string; nazwa: string | null }[]>([])
   const [narzutDomyslny, setNarzutDomyslny] = useState(12)
+  const [narzutUslugObcych, setNarzutUslugObcych] = useState(10)
   const [gotowe, setGotowe] = useState(false)
   const [blad, setBlad] = useState<string | null>(null)
 
@@ -51,7 +54,7 @@ export function DostawcaSlownikow({ children }: { children: ReactNode }) {
         supabase.from('cennik_kategorie').select('*').order('nr_pozycji'),
         supabase.from('stawki_robocizny').select('*').order('numer_linii'),
         supabase.from('mpk').select('kod, nazwa').eq('aktywne', true).order('kod'),
-        supabase.from('ustawienia').select('wartosc').eq('klucz', 'narzut_material_proc').maybeSingle(),
+        supabase.from('ustawienia').select('klucz, wartosc').in('klucz', ['narzut_material_proc', 'narzut_uslugi_obce_proc']),
       ])
       if (kat.error) throw kat.error
       if (st.error) throw st.error
@@ -60,7 +63,12 @@ export function DostawcaSlownikow({ children }: { children: ReactNode }) {
       setKategorie(kat.data as Kategoria[])
       setStawki((st.data as Stawka[]).map((s) => ({ ...s, cena: Number(s.cena) })))
       setMpk(m.data ?? [])
-      if (ust.data && Number.isFinite(Number(ust.data.wartosc))) setNarzutDomyslny(Number(ust.data.wartosc))
+      for (const u of ust.data ?? []) {
+        const n = Number(u.wartosc)
+        if (!Number.isFinite(n)) continue
+        if (u.klucz === 'narzut_material_proc') setNarzutDomyslny(n)
+        if (u.klucz === 'narzut_uslugi_obce_proc') setNarzutUslugObcych(n)
+      }
       setBlad(null)
       setGotowe(true)
     } catch (e) {
@@ -83,11 +91,12 @@ export function DostawcaSlownikow({ children }: { children: ReactNode }) {
       mpk,
       materialWgKategorii,
       narzutDomyslny,
+      narzutUslugObcych,
       gotowe,
       blad,
       odswiez,
     }
-  }, [pozycje, kategorie, stawki, mpk, narzutDomyslny, gotowe, blad, odswiez])
+  }, [pozycje, kategorie, stawki, mpk, narzutDomyslny, narzutUslugObcych, gotowe, blad, odswiez])
 
   return <Kontekst.Provider value={wartosc}>{children}</Kontekst.Provider>
 }

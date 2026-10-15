@@ -1,9 +1,15 @@
 import { CheckCircle2, CircleAlert, FileDown, Plus, Trash2 } from 'lucide-react'
-import { SZABLONY, brakiKarty, szablon, type Pole } from '@/lib/szablony'
+import { SZABLONY, brakiKarty, szablon, type ParametrySilnika, type Pole } from '@/lib/szablony'
 import { nowyKlucz } from '@/lib/obliczenia'
-import type { KartaRemontowa } from '@/lib/types'
+import type { KartaRemontowa, Zalacznik } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { PoleWyboru } from '../PoleWyboru'
+import { Zalaczniki } from '../Zalaczniki'
+
+/** Silnik z pozycji cennika zlecenia - źródło mocy, napięcia i obrotów dla karty. */
+export interface SilnikZPozycji extends ParametrySilnika {
+  opis: string
+}
 
 interface Props {
   karty: KartaRemontowa[]
@@ -17,6 +23,21 @@ interface Props {
   edycja: boolean
   /** Pobranie PDF wskazanych kart (do załączenia w Synthosie). */
   pdf: (karty: KartaRemontowa[]) => void
+  /** Skany kart wgrane jako PDF (wypełnione odręcznie na stanowisku remontu). */
+  skany: Zalacznik[]
+  zlecenieId: string | null
+  mozeDodacZalacznik: boolean
+  odswiezZalaczniki: () => Promise<void>
+  /** Silniki z pozycji cennika - po jednym wpisie na sztukę. */
+  silniki: SilnikZPozycji[]
+}
+
+const tylkoParametry = (s: SilnikZPozycji): Record<string, string> => {
+  const w: Record<string, string> = {}
+  if (s.moc_kw) w.moc_kw = s.moc_kw
+  if (s.napiecie_v) w.napiecie_v = s.napiecie_v
+  if (s.obroty) w.obroty = s.obroty
+  return w
 }
 
 export function nowaKarta(szablonId: string, numer: string, nazwa: string, mechanik: string): KartaRemontowa {
@@ -27,12 +48,19 @@ export function nowaKarta(szablonId: string, numer: string, nazwa: string, mecha
   }
 }
 
-export function KartyRemontowe({ karty, ustaw, wymagane, szablonZlecenia, nazwaZlecenia, mechanik, numerKarty, edycja, pdf }: Props) {
-  const brakuje = Math.max(0, wymagane - karty.length)
+export function KartyRemontowe({ karty, ustaw, wymagane, szablonZlecenia, nazwaZlecenia, mechanik, numerKarty, edycja, pdf,
+  skany, zlecenieId, mozeDodacZalacznik, odswiezZalaczniki, silniki }: Props) {
+  const kartWSkanach = skany.reduce((s, z) => s + z.liczba_kart, 0)
+  const brakuje = Math.max(0, wymagane - karty.length - kartWSkanach)
 
   function dodaj(ile: number) {
-    const nowe = Array.from({ length: ile }, (_, i) =>
-      nowaKarta(szablonZlecenia, numerKarty(i), nazwaZlecenia, mechanik))
+    // Karta silnika dostaje moc, napięcie i obroty z kolejnego silnika z pozycji cennika.
+    const kartSilnikow = karty.filter((k) => k.szablon === 'silnik').length
+    const nowe = Array.from({ length: ile }, (_, i) => {
+      const k = nowaKarta(szablonZlecenia, numerKarty(i), nazwaZlecenia, mechanik)
+      const silnik = szablonZlecenia === 'silnik' ? silniki[kartSilnikow + i] : undefined
+      return silnik ? { ...k, urzadzenie_nazwa: k.urzadzenie_nazwa || silnik.opis, dane: tylkoParametry(silnik) } : k
+    })
     ustaw([...karty, ...nowe])
   }
 
@@ -46,7 +74,7 @@ export function KartyRemontowe({ karty, ustaw, wymagane, szablonZlecenia, nazwaZ
         brakuje > 0 ? 'bg-amber-50 text-amber-900 ring-amber-300' : 'bg-slate-50 text-slate-700 ring-slate-200',
       )}>
         {wymagane > 0
-          ? <>Pozycje cennikowe tego zlecenia wymagają <strong>{wymagane}</strong> {wymagane === 1 ? 'karty' : 'kart'} remontowych (1 na sztukę). Wypełniono: <strong>{karty.length}</strong>.</>
+          ? <>Pozycje cennikowe tego zlecenia wymagają <strong>{wymagane}</strong> {wymagane === 1 ? 'karty' : 'kart'} remontowych (1 na sztukę). Wypełniono w aplikacji: <strong>{karty.length}</strong>{kartWSkanach > 0 && <>, w skanach PDF: <strong>{kartWSkanach}</strong></>}.</>
           : <>Żadna pozycja tego zlecenia nie wymaga karty remontowej (zaznaczenie „Karta” przy pozycji). Kartę można dodać dobrowolnie.</>}
         {karty.length > 0 && (
           <button onClick={() => pdf(karty)} className="inline-flex items-center gap-1 rounded bg-white px-3 py-1 text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100">
@@ -60,8 +88,17 @@ export function KartyRemontowe({ karty, ustaw, wymagane, szablonZlecenia, nazwaZ
         )}
       </div>
 
+      <div className="rounded-md border border-dashed border-slate-300 p-3">
+        <p className="mb-1 text-sm font-medium">Skan karty remontowej (PDF)</p>
+        <p className="mb-2 text-xs text-slate-500">
+          Karta wypełniona odręcznie na stanowisku remontu? Wgraj jej skan - liczy się jak wypełniona karta. Jeśli w jednym pliku jest kilka kart, ustaw ich liczbę.
+        </p>
+        <Zalaczniki zlecenieId={zlecenieId} zalaczniki={skany} typ="karta_remontowa" mozna={mozeDodacZalacznik}
+          odswiez={odswiezZalaczniki} etykieta="Wgraj skan karty (PDF / zdjęcie)" liczbaKart />
+      </div>
+
       {karty.map((k, i) => (
-        <Karta key={k.klucz} karta={k} nr={i + 1} edycja={edycja} zmien={(z) => zmien(k, z)} pdf={() => pdf([k])}
+        <Karta key={k.klucz} karta={k} nr={i + 1} edycja={edycja} zmien={(z) => zmien(k, z)} pdf={() => pdf([k])} silniki={silniki}
           usun={() => ustaw(karty.filter((x) => x !== k))} />
       ))}
 
@@ -74,13 +111,14 @@ export function KartyRemontowe({ karty, ustaw, wymagane, szablonZlecenia, nazwaZ
   )
 }
 
-function Karta({ karta, nr, edycja, zmien, usun, pdf }: {
+function Karta({ karta, nr, edycja, zmien, usun, pdf, silniki }: {
   karta: KartaRemontowa
   nr: number
   edycja: boolean
   zmien: (z: Partial<KartaRemontowa>) => void
   usun: () => void
   pdf: () => void
+  silniki: SilnikZPozycji[]
 }) {
   const s = szablon(karta.szablon)
   const braki = brakiKarty(karta)
@@ -133,6 +171,20 @@ function Karta({ karta, nr, edycja, zmien, usun, pdf }: {
             onChange={(e) => zmien({ opis_uszkodzenia: e.target.value })} />
         </label>
 
+        {karta.szablon === 'silnik' && silniki.length > 0 && edycja && (
+          <label className="block sm:col-span-2">
+            <span className="etykieta">Uzupełnij moc / napięcie / obroty z pozycji cennika</span>
+            <select className="pole" value="" onChange={(e) => {
+              const s = silniki.find((x) => x.opis === e.target.value)
+              if (s) zmien({ dane: { ...karta.dane, ...tylkoParametry(s) }, urzadzenie_nazwa: karta.urzadzenie_nazwa || s.opis })
+            }}>
+              <option value="">wybierz silnik z pozycji zlecenia…</option>
+              {[...new Map(silniki.map((s) => [s.opis, s])).values()].map((s) => (
+                <option key={s.opis} value={s.opis}>{s.opis}</option>
+              ))}
+            </select>
+          </label>
+        )}
         {s.polaKarty.map((p) => (
           <PoleSzablonu key={p.klucz} pole={p} wartosc={karta.dane[p.klucz]} edycja={edycja} zmien={(w) => ustawDane(p.klucz, w)} />
         ))}
