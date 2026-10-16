@@ -868,7 +868,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
       <Dialog open={potwierdzUsun} onOpenChange={setPotwierdzUsun}>
         <DialogContent>
           <DialogTitle>Usunąć zlecenie?</DialogTitle>
-          <DialogDescription>„{naglowek.nazwa}” zostanie usunięte razem z pozycjami, materiałami i kartami. Tej operacji nie da się cofnąć.</DialogDescription>
+          <DialogDescription>„{naglowek.nazwa}” zostanie usunięte razem z pozycjami, materiałami i kartami. Dział handlowy może je przywrócić z zakładki „Kosz”.</DialogDescription>
           <div className="mt-4 flex justify-end gap-2">
             <Button onClick={() => setPotwierdzUsun(false)}>Anuluj</Button>
             <Button wariant="ostrzezenie" disabled={zajety} onClick={() => void usun()}>Usuń</Button>

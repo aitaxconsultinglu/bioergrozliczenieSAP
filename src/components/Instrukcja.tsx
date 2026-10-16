@@ -150,6 +150,10 @@ export function Instrukcja({ profil }: { profil: Profil }) {
               <p>Po wygenerowaniu AZO w Optimie wpisz jego numer w zleceniu w polu <strong>„Nr AZO”</strong> i kliknij „Zapisz” - działa na każdym etapie, także po eksporcie i zakończeniu.
                 Na liście zleceń są kolumny Nr AZO i Konto: wyszukasz po nich zrealizowane zamówienia i posortujesz listę.</p>
             </Krok>
+            <Krok nr="3b" tytul="Filtry i kosz">
+              <p>Na liście zleceń przy każdym nagłówku jest ikonka lejka: wybierasz wartości z kolumny (np. konto, MPK, status, miesiąc zmiany), jak w Excelu.
+                Usunięte zlecenia trafiają do zakładki <strong>„Kosz”</strong> - przycisk „Przywróć” odtwarza je razem z pozycjami, materiałami, kartami i załącznikami.</p>
+            </Krok>
             <Krok nr={4} tytul="Poprawki">
               <p><strong>„Zakończony”</strong> - ostatni status, gdy zlecenie jest już rozliczone. Ustawisz go przyciskiem „Zakończ” w wyeksportowanym zleceniu
                 albo zbiorczo na liście zleceń (zaznacz wyeksportowane → „Oznacz jako zakończone”). Na liście możesz sortować po każdej kolumnie (klik w nagłówek), także po statusie,

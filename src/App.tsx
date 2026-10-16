@@ -15,9 +15,10 @@ import { Uzytkownicy } from './components/Uzytkownicy'
 import { Instrukcja } from './components/Instrukcja'
 import { NowaWersja } from './components/NowaWersja'
 import { ZakupyOptima } from './components/ZakupyOptima'
+import { Kosz } from './components/Kosz'
 import { Button } from './components/ui/button'
 
-type Widok = 'zlecenia' | 'eksport' | 'braki' | 'cennik' | 'optima' | 'uzytkownicy' | 'instrukcja'
+type Widok = 'zlecenia' | 'eksport' | 'braki' | 'cennik' | 'optima' | 'uzytkownicy' | 'kosz' | 'instrukcja'
 
 export default function App() {
   const [sesja, setSesja] = useState<Session | null>(null)
@@ -113,6 +114,7 @@ function Aplikacja({ profil, zmienHaslo }: { profil: Profil; zmienHaslo: () => v
         { id: 'cennik', etykieta: 'Cennik' },
         { id: 'optima', etykieta: 'Ceny z Optimy' },
         { id: 'uzytkownicy', etykieta: 'Użytkownicy' },
+        { id: 'kosz', etykieta: 'Kosz' },
         { id: 'instrukcja', etykieta: 'Instrukcja' },
       ]
     : [
@@ -187,6 +189,8 @@ function Aplikacja({ profil, zmienHaslo }: { profil: Profil; zmienHaslo: () => v
           <Cennik profil={profil} />
         ) : widok === 'uzytkownicy' && handlowiec ? (
           <Uzytkownicy profil={profil} />
+        ) : widok === 'kosz' && handlowiec ? (
+          <Kosz otworz={setOtwarte} />
         ) : widok === 'optima' && handlowiec ? (
           <ZakupyOptima />
         ) : widok === 'instrukcja' ? (

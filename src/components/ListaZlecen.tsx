@@ -9,6 +9,7 @@ import type { Dostawca, Profil, StatusZlecenia } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
+import { FiltrKolumny, PUSTE } from './FiltrKolumny'
 
 interface Wiersz {
   id: string
@@ -61,6 +62,22 @@ function porownaj(a: Wiersz, b: Wiersz, k: Kolumna): number {
   }
 }
 
+type KolumnaFiltra = Exclude<Kolumna, 'wartosc'>
+
+/** Wartość komórki tak, jak pokazuje ją filtr kolumny. */
+function wartoscDoFiltra(w: Wiersz, k: KolumnaFiltra): string {
+  switch (k) {
+    case 'nr': return w.nr_zamowienia ? `${w.nr_zamowienia}${w.pozycja_zamowienia ? `-${w.pozycja_zamowienia}` : ''}` : PUSTE
+    case 'azo': return w.nr_azo?.trim() || PUSTE
+    case 'konto': return w.konto?.trim() || PUSTE
+    case 'nazwa': return w.nazwa.trim() || PUSTE
+    case 'mpk': return w.mpk
+    case 'mechanik': return w.mechanik?.trim() || PUSTE
+    case 'status': return ETYKIETY_STATUSU[w.status]
+    case 'zmieniono': return `${w.zmodyfikowano.slice(5, 7)}.${w.zmodyfikowano.slice(0, 4)}` // miesiąc zmiany
+  }
+}
+
 interface Props {
   profil: Profil
   otworz: (id: string) => void
@@ -76,6 +93,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
   const [mpk, setMpk] = useState('')
   const [szukaj, setSzukaj] = useState('')
   const [sortowanie, setSortowanie] = useState<Sortowanie>(wczytajSortowanie)
+  const [filtry, setFiltry] = useState<Partial<Record<KolumnaFiltra, Set<string>>>>({})
   const [zaznaczone, setZaznaczone] = useState<Set<string>>(new Set())
   const [potwierdzZakonczenie, setPotwierdzZakonczenie] = useState(false)
   const [zajety, setZajety] = useState(false)
@@ -118,16 +136,29 @@ export function ListaZlecen({ profil, otworz }: Props) {
     })
   }
 
-  const widoczne = useMemo(() => {
+  // Filtry z paska (szukaj / status / MPK) + filtry kolumn; `pomin` pozwala policzyć wartości
+  // do listy w filtrze danej kolumny z uwzględnieniem pozostałych filtrów (jak w Excelu).
+  const pasuje = useCallback((w: Wiersz, pomin?: KolumnaFiltra) => {
     const fraza = szukaj.trim().toLowerCase()
-    const odfiltrowane = wiersze.filter((w) =>
-      (!status || (status === OTWARTE ? w.status !== 'zakonczony' : w.status === status))
-      && (!mpk || w.mpk === mpk)
-      && (!fraza || `${w.nazwa} ${w.nr_zamowienia ?? ''} ${w.mechanik ?? ''} ${w.nr_azo ?? ''} ${w.konto ?? ''}`.toLowerCase().includes(fraza)))
+    if (status && (status === OTWARTE ? w.status === 'zakonczony' : w.status !== status)) return false
+    if (mpk && w.mpk !== mpk) return false
+    if (fraza && !`${w.nazwa} ${w.nr_zamowienia ?? ''} ${w.mechanik ?? ''} ${w.nr_azo ?? ''} ${w.konto ?? ''}`.toLowerCase().includes(fraza)) return false
+    for (const [k, wybrane] of Object.entries(filtry) as [KolumnaFiltra, Set<string>][]) {
+      if (k !== pomin && !wybrane.has(wartoscDoFiltra(w, k))) return false
+    }
+    return true
+  }, [szukaj, status, mpk, filtry])
+
+  const widoczne = useMemo(() => {
     const kier = sortowanie.rosnaco ? 1 : -1
     // Przy remisie najnowsze zmiany na górze, żeby kolejność była stabilna.
-    return [...odfiltrowane].sort((a, b) => kier * porownaj(a, b, sortowanie.kolumna) || b.zmodyfikowano.localeCompare(a.zmodyfikowano))
-  }, [wiersze, status, mpk, szukaj, sortowanie])
+    return wiersze.filter((w) => pasuje(w))
+      .sort((a, b) => kier * porownaj(a, b, sortowanie.kolumna) || b.zmodyfikowano.localeCompare(a.zmodyfikowano))
+  }, [wiersze, pasuje, sortowanie])
+
+  const ileFiltrow = Object.keys(filtry).length
+  const ustawFiltr = (k: KolumnaFiltra, w: Set<string> | null) =>
+    setFiltry((f) => { const n = { ...f }; if (w === null) delete n[k]; else n[k] = w; return n })
 
   const doPoprawki = wiersze.filter((w) => w.status === 'zwrocony').length
   const wybrane = widoczne.filter((w) => zaznaczone.has(w.id))
@@ -145,16 +176,24 @@ export function ListaZlecen({ profil, otworz }: Props) {
     await wczytaj()
   }
 
-  const Naglowek = ({ kolumna, children, className }: { kolumna: Kolumna; children: string; className?: string }) => {
+  // Funkcja, nie komponent: komponent zdefiniowany w środku listy byłby przy każdym renderze
+  // nowym typem - React montowałby nagłówek od nowa i zamykał otwarty filtr.
+  const naglowek = (kolumna: Kolumna, etykieta: string, className?: string) => {
     const aktywna = sortowanie.kolumna === kolumna
     const Ikona = !aktywna ? ArrowUpDown : sortowanie.rosnaco ? ArrowUp : ArrowDown
     return (
       <th className={cn('komorka-naglowek', className)} aria-sort={aktywna ? (sortowanie.rosnaco ? 'ascending' : 'descending') : 'none'}>
-        <button onClick={() => sortuj(kolumna)} title="Sortuj"
-          className={cn('inline-flex items-center gap-1 uppercase hover:text-slate-900', aktywna && 'text-slate-900')}>
-          {children}
-          <Ikona className={cn('h-3.5 w-3.5', !aktywna && 'opacity-40')} />
-        </button>
+        <span className="inline-flex items-center gap-1">
+          <button onClick={() => sortuj(kolumna)} title="Sortuj"
+            className={cn('inline-flex items-center gap-1 uppercase hover:text-slate-900', aktywna && 'text-slate-900')}>
+            {etykieta}
+            <Ikona className={cn('h-3.5 w-3.5', !aktywna && 'opacity-40')} />
+          </button>
+          {kolumna !== 'wartosc' && (
+            <FiltrKolumny etykieta={etykieta} wybrane={filtry[kolumna] ?? null} zmien={(w) => ustawFiltr(kolumna, w)}
+              wartosci={wiersze.filter((w) => pasuje(w, kolumna)).map((w) => wartoscDoFiltra(w, kolumna))} />
+          )}
+        </span>
       </th>
     )
   }
@@ -165,7 +204,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
         <div>
           <h2 className="text-lg font-semibold">{handlowiec ? 'Wszystkie zlecenia' : 'Moje zlecenia'}</h2>
           <p className="text-sm text-slate-500">
-            {handlowiec ? 'Zlecenia ze wszystkich MPK.' : `MPK: ${profil.mpk.join(', ')}`} Kliknij nagłówek kolumny, aby sortować.
+            {handlowiec ? 'Zlecenia ze wszystkich MPK.' : `MPK: ${profil.mpk.join(', ')}`} Kliknij nagłówek kolumny, aby sortować; ikonka lejka obok filtruje po wartościach.
           </p>
         </div>
         <div className="ml-auto flex gap-2">
@@ -199,6 +238,12 @@ export function ListaZlecen({ profil, otworz }: Props) {
         )}
       </div>
 
+      {ileFiltrow > 0 && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-slate-600">Filtry kolumn: <strong>{ileFiltrow}</strong> · pokazano {widoczne.length} z {wiersze.length} zleceń</span>
+          <button className="text-blekit-ciemny underline" onClick={() => setFiltry({})}>Wyczyść filtry kolumn</button>
+        </div>
+      )}
       {blad && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{blad}</p>}
       {komunikat && <p className="rounded bg-limonka-jasna px-3 py-2 text-sm text-limonka-ciemna">{komunikat}</p>}
 
@@ -222,15 +267,15 @@ export function ListaZlecen({ profil, otworz }: Props) {
                     onChange={() => setZaznaczone(wszystkieZaznaczone ? new Set() : new Set(doZakonczenia.map((w) => w.id)))} />
                 </th>
               )}
-              <Naglowek kolumna="nr">Nr zamówienia</Naglowek>
-              <Naglowek kolumna="azo">Nr AZO</Naglowek>
-              <Naglowek kolumna="konto">Konto</Naglowek>
-              <Naglowek kolumna="nazwa">Nazwa</Naglowek>
-              <Naglowek kolumna="mpk">MPK</Naglowek>
-              <Naglowek kolumna="mechanik">Mechanik</Naglowek>
-              <Naglowek kolumna="status">Status</Naglowek>
-              <Naglowek kolumna="wartosc" className="text-right">Wartość [zł]</Naglowek>
-              <Naglowek kolumna="zmieniono">Zmieniono</Naglowek>
+              {naglowek('nr', 'Nr zamówienia')}
+              {naglowek('azo', 'Nr AZO')}
+              {naglowek('konto', 'Konto')}
+              {naglowek('nazwa', 'Nazwa')}
+              {naglowek('mpk', 'MPK')}
+              {naglowek('mechanik', 'Mechanik')}
+              {naglowek('status', 'Status')}
+              {naglowek('wartosc', 'Wartość [zł]', 'text-right')}
+              {naglowek('zmieniono', 'Zmieniono')}
             </tr>
           </thead>
           <tbody>
