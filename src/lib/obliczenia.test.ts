@@ -68,8 +68,8 @@ describe('eksport SAP', () => {
     expect(wiersze[2]).toEqual([20, '5005843', 'SIMMERING 35X55X10', 96.03, null, 'JD', 1, 96.03, 9.6, 10, null])
   })
   it('materiał Synthos nie trafia do eksportu', () => expect(wiersze).toHaveLength(3))
-  it('schowek: tabulatory, przecinek dziesiętny, bez nagłówka', () => {
-    expect(tekstDoSchowka([wiersze[2]])).toBe('20\t5005843\tSIMMERING 35X55X10\t96,03\t\tJD\t1\t96,03\t9,6\t10\t')
+  it('schowek: układ Fiori (8 kolumn), tabulatory, przecinek dziesiętny, bez nagłówka', () => {
+    expect(tekstDoSchowka([wiersze[2]])).toBe('20\t5005843\tSIMMERING 35X55X10\t96,03\t96,03\t9,6\t10\t')
   })
 })
 
@@ -126,5 +126,21 @@ describe('parametry silnika z indeksu', () => {
       pozycje_uslug: [], pozycje_materialowe: [],
       uslugi_obce: [{ opis: 'Wyważanie wirnika', wykonawca: 'Firma X', numer_faktury: 'FV 1', wartosc_zakupu: 500, narzut_proc: 10, nr_linii_sap: null, kolejnosc: 0 }] }, new Map())
     expect(w).toEqual([[10, '5001720', 'Wyważanie wirnika', 550, null, 'JD', 1, 550, null, null, null]])
+  })
+})
+
+describe('plik XLSX w układzie Fiori', () => {
+  it('arkusz zamówienia ma 8 kolumn jak wzór działu handlowego', async () => {
+    const { plikXlsx } = await import('./eksportSap')
+    const { default: XLSX } = await import('xlsx-js-style')
+    const blob = await plikXlsx([{
+      id: 'f', mpk: 'P04', nr_zamowienia: '4200000002', pozycja_zamowienia: null, nazwa: 'POMPA', linia_materialy: 20,
+      pozycje_uslug: [],
+      pozycje_materialowe: [{ nazwa: 'EMALIA', ilosc: 0.5, wartosc_zakupu: 18.75, narzut_proc: 12, dostawca: 'bioerg', kolejnosc: 0 }],
+    }], new Map())
+    const wb = XLSX.read(new Uint8Array(await blob.arrayBuffer()), { type: 'array' })
+    const wiersze = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets['4200000002'], { header: 1 })
+    expect(wiersze[0]).toEqual(['Numer linii', 'Numer usługi', 'Krótki tekst', 'Ilość', 'Wartość', 'Cena Mat.', 'Ilość Mat.', 'Nr Mat. dostawcy'])
+    expect(wiersze[1]).toEqual([20, '5005843', 'EMALIA', 21, 21, 42, 0.5])
   })
 })

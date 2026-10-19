@@ -6,7 +6,7 @@ import { komunikatPL } from '@/lib/config'
 import { ETYKIETY_BRAKU, ETYKIETY_STATUSU, KOLORY_STATUSU, dataGodzinaPL, zl } from '@/lib/format'
 import { czySynthos, grosze, nowyKlucz, policzSumy, wartoscMaterialu } from '@/lib/obliczenia'
 import { SZABLONY, brakiKarty, parametrySilnika, szablon } from '@/lib/szablony'
-import { KOLUMNY_SAP, etykietaZamowienia, plikXlsx, pobierz, tekstDoSchowka, wierszeSap, type ZlecenieDoEksportu } from '@/lib/eksportSap'
+import { KOLUMNY_KWOT, KOLUMNY_SAP, ukladFiori, etykietaZamowienia, plikXlsx, pobierz, tekstDoSchowka, wierszeSap, type ZlecenieDoEksportu } from '@/lib/eksportSap'
 import type {
   BrakGodzin, KartaRemontowa, PozycjaMaterialowa, PozycjaUslugi, Profil, StatusZlecenia, Zlecenie, UslugaObca, Zalacznik,
 } from '@/lib/types'
@@ -705,7 +705,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
             <thead><tr>{KOLUMNY_SAP.map((k) => <th key={k} className="komorka-naglowek">{k}</th>)}</tr></thead>
             <tbody>
               {podgladSap.map((w, i) => (
-                <tr key={i}>{w.map((c, j) => <td key={j} className={cn('komorka', typeof c === 'number' && 'liczba')}>{typeof c === 'number' && j >= 6 ? zl(c) : c ?? ''}</td>)}</tr>
+                <tr key={i}>{ukladFiori(w).map((c, j) => <td key={j} className={cn('komorka', typeof c === 'number' && 'liczba')}>{typeof c === 'number' && KOLUMNY_KWOT.has(j) ? zl(c) : c ?? ''}</td>)}</tr>
               ))}
             </tbody>
           </table>

@@ -29,13 +29,29 @@
 import { cenaJednMaterialu, cenaUslugi, czySynthos, grosze, wartoscMaterialu, wartoscUslugi, wartoscUslugiObcej } from './obliczenia'
 import type { Dostawca, PozycjaCennika } from './types'
 
-export const KOLUMNY_SAP = [
+/** Pełny wiersz rozliczenia (11 pól z BRIEF 3.5) - z niego powstaje układ do wklejenia. */
+export const KOLUMNY_PELNE = [
   'Numer linii', 'Numer usługi', 'Krótki tekst', 'Ilość', 'Pozostało', 'Podst. t.JM',
   'Cena', 'Wartość', 'Cena Mat.', 'Ilość Mat.', 'Nr Mat. dostawcy',
 ] as const
 
+/**
+ * Układ do wklejenia w Fiori (wzór od działu handlowego 2026-10-19): bez kolumn Pozostało,
+ * Podst. t.JM i Cena - tak wygląda XLSX, podgląd i tekst kopiowany do schowka.
+ */
+export const KOLUMNY_SAP = [
+  'Numer linii', 'Numer usługi', 'Krótki tekst', 'Ilość', 'Wartość', 'Cena Mat.', 'Ilość Mat.', 'Nr Mat. dostawcy',
+] as const
+/** Kolumny układu z kwotami w zł (do formatowania w podglądzie). */
+export const KOLUMNY_KWOT = new Set([4, 5])
+
 export type KomorkaSap = string | number | null
 export type WierszSap = [number | null, string, string, number, null, string, number, number, number | null, number | null, null]
+
+/** Pełny wiersz -> układ do wklejenia (KOLUMNY_SAP). */
+export function ukladFiori(w: WierszSap): KomorkaSap[] {
+  return [w[0], w[1], w[2], w[3], w[7], w[8], w[9], w[10]]
+}
 
 /** Indeks SAP, pod którym eksportujemy materiał (narzut 12%, zmiana 2026-10-19). */
 export const INDEKS_MATERIALU = '5005843'
@@ -155,12 +171,14 @@ export function sumaWierszy(wiersze: WierszSap[]) {
 export function tekstDoSchowka(wiersze: WierszSap[]) {
   const komorka = (v: KomorkaSap) =>
     v === null ? '' : typeof v === 'number' ? String(v).replace('.', ',') : v.replace(/[\t\n\r]/g, ' ')
-  return wiersze.map((w) => w.map(komorka).join('\t')).join('\r\n')
+  return wiersze.map((w) => ukladFiori(w).map(komorka).join('\t')).join('\r\n')
 }
 
 export function etykietaZamowienia(z: Pick<ZlecenieDoEksportu, 'nr_zamowienia' | 'pozycja_zamowienia'>) {
   return `${z.nr_zamowienia ?? 'bez numeru'}${z.pozycja_zamowienia ? `-${z.pozycja_zamowienia}` : ''}`
 }
+
+const SZEROKOSCI_SAP = [11, 13, 42, 10, 11, 10, 10, 16]
 
 const STYL_NAGLOWKA = {
   font: { bold: true },
@@ -249,12 +267,12 @@ export async function plikXlsx(zlecenia: ZlecenieDoEksportu[], materialy: Materi
     linie.push([`Zamówienie ${etykietaZamowienia(z)}  ·  ${z.nazwa}  ·  MPK ${z.mpk}  ·  razem ${suma.toFixed(2).replace('.', ',')} zł`])
     naglowkiKolumn.push(linie.length)
     linie.push([...KOLUMNY_SAP])
-    linie.push(...wiersze)
+    linie.push(...wiersze.map(ukladFiori))
     linie.push([])
     zestawienie.push([etykietaZamowienia(z), z.nr_azo ?? '', z.konto ?? '', z.mpk, z.nazwa, wiersze.length, suma])
 
-    const ws = XLSX.utils.aoa_to_sheet([[...KOLUMNY_SAP], ...wiersze])
-    ws['!cols'] = [8, 12, 42, 10, 10, 10, 10, 12, 10, 10, 14].map((wch) => ({ wch }))
+    const ws = XLSX.utils.aoa_to_sheet([[...KOLUMNY_SAP], ...wiersze.map(ukladFiori)])
+    ws['!cols'] = SZEROKOSCI_SAP.map((wch) => ({ wch }))
     styluj(ws, 0, KOLUMNY_SAP.length, STYL_NAGLOWKA)
     // Nazwa arkusza: max 31 znaków, bez znaków zabronionych, unikalna.
     let nazwa = etykietaZamowienia(z).replace(/[\\/?*[\]:]/g, '_').slice(0, 28)
@@ -266,7 +284,7 @@ export async function plikXlsx(zlecenia: ZlecenieDoEksportu[], materialy: Materi
   zestawienie.push(['RAZEM', '', '', '', '', '', grosze(razem)])
 
   const wsL = XLSX.utils.aoa_to_sheet(linie)
-  wsL['!cols'] = [8, 12, 42, 10, 10, 10, 10, 12, 10, 10, 14].map((wch) => ({ wch }))
+  wsL['!cols'] = SZEROKOSCI_SAP.map((wch) => ({ wch }))
   naglowkiBlokow.forEach((r) => styluj(wsL, r, 1, STYL_BLOKU))
   naglowkiKolumn.forEach((r) => styluj(wsL, r, KOLUMNY_SAP.length, STYL_NAGLOWKA))
   XLSX.utils.book_append_sheet(wb, wsL, 'Linie SAP')

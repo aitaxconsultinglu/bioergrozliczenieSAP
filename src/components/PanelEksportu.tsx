@@ -5,7 +5,7 @@ import { useSlowniki } from '@/lib/slowniki'
 import { komunikatPL } from '@/lib/config'
 import { dataGodzinaPL, dzisiajISO, zl } from '@/lib/format'
 import {
-  KOLUMNY_SAP, etykietaZamowienia, maPozycjeSpozaCennika, pobierz, plikXlsx, sumaWierszy, tekstDoSchowka, wierszeSap,
+  KOLUMNY_KWOT, KOLUMNY_SAP, ukladFiori, etykietaZamowienia, maPozycjeSpozaCennika, pobierz, plikXlsx, sumaWierszy, tekstDoSchowka, wierszeSap,
   type ZlecenieDoEksportu,
 } from '@/lib/eksportSap'
 import { cn } from '@/lib/utils'
@@ -211,7 +211,7 @@ export function PanelEksportu({ otworz }: { otworz: (id: string) => void }) {
                           <tbody>
                             {wiersze.map((w, i) => (
                               <tr key={i} className="bg-white">
-                                {w.map((c, j) => <td key={j} className={cn('komorka', typeof c === 'number' && 'liczba')}>{typeof c === 'number' && j >= 6 ? zl(c) : c ?? ''}</td>)}
+                                {ukladFiori(w).map((c, j) => <td key={j} className={cn('komorka', typeof c === 'number' && 'liczba')}>{typeof c === 'number' && KOLUMNY_KWOT.has(j) ? zl(c) : c ?? ''}</td>)}
                               </tr>
                             ))}
                           </tbody>

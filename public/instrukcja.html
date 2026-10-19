@@ -149,7 +149,7 @@ html { scroll-behavior: smooth; }
       <p class="lead">Zamiast przepisywać karty, kopiujesz gotowe linie w układzie importu SAP.</p>
     </header>
     <ol class="kroki">
-      <li><h3>Zakładka „Eksport do SAP”</h3><div><p>Lista zleceń złożonych przez kierowników. Strzałka przy zleceniu pokazuje linie, które trafią do SAP: Numer linii, Numer usługi, Krótki tekst, Ilość, Pozostało, Podst. t.JM, Cena, Wartość, Cena Mat., Ilość Mat., Nr Mat. dostawcy. Żółte oznaczenie „pozycja spoza cennika” oznacza, że trzeba sprawdzić opis, cenę i indeks. Szare „bez nr linii”: numer linii zamówienia uzupełnij w SAP.</p></div></li>
+      <li><h3>Zakładka „Eksport do SAP”</h3><div><p>Lista zleceń złożonych przez kierowników. Strzałka przy zleceniu pokazuje linie, które trafią do SAP: Numer linii, Numer usługi, Krótki tekst, Ilość, Wartość, Cena Mat., Ilość Mat., Nr Mat. dostawcy - w tym samym układzie jest plik XLSX i tekst kopiowany do schowka, gotowy do wklejenia w Fiori. Żółte oznaczenie „pozycja spoza cennika” oznacza, że trzeba sprawdzić opis, cenę i indeks. Szare „bez nr linii”: numer linii zamówienia uzupełnij w SAP.</p></div></li>
       <li><h3>Wklejenie do SAP</h3><div><p><span class="btn">Kopiuj</span> przy zleceniu kopiuje jego linie do schowka. W SAP otwórz rozliczenie tego zamówienia i wklej (Ctrl+V). Albo zaznacz kilka zleceń i kliknij <span class="btn">Pobierz XLSX</span>. Pierwszy arkusz „Linie SAP” zawiera wszystkie zamówienia jedno pod drugim, arkusz „Szczegóły” całe rozliczenie (cennik, roboczogodziny, materiał z ceną zakupu, narzutem i dokumentem PZ/FZ). Ten sam plik dla jednego zlecenia: przycisk „XLSX” w zleceniu.</p></div></li>
       <li><h3>Oznacz jako wyeksportowane</h3><div><p>Po wprowadzeniu do SAP zaznacz zlecenia i kliknij <span class="btn">Oznacz jako wyeksportowane</span>. Znikną z listy i zostaną zablokowane, więc nic nie trafi do SAP dwa razy. Pomyłkę cofniesz w samym zleceniu przyciskiem „Cofnij eksport”.</p></div></li>
       <li><h3>Nr AZO i wyszukiwanie</h3><div><p>Po wygenerowaniu AZO w Optimie wpisz jego numer w zleceniu (pole „Nr AZO”) - także po eksporcie i zakończeniu. Lista zleceń ma kolumny Nr AZO i Konto, po których wyszukasz i posortujesz zrealizowane zamówienia.</p></div></li>
@@ -162,7 +162,7 @@ html { scroll-behavior: smooth; }
     <div class="uwaga"><strong>Do sprawdzenia na przykładach:</strong> skopiuj linie przykładowego zlecenia pompy i porównaj z tym, co wklejasz do SAP. Odpowiedz na trzy pytania:
       <ol class="test">
         <li>Czy materiał wpisujesz osobnymi liniami, czy jedną zbiorczą linią „Materiał +12%”? Od tego zależy różnica rzędu groszy w zaokrągleniach.</li>
-        <li>Co wpisujesz w kolumnach „Pozostało”, „Cena Mat.”, „Ilość Mat.” i „Nr Mat. dostawcy”?</li>
+        <li>Co wpisujesz w kolumnie „Nr Mat. dostawcy”?</li>
         <li>Czy PDF karty wygląda jak wzór, który załączasz w Synthosie? Prześlij wzór, a dopasujemy układ.</li>
       </ol>
     </div>
