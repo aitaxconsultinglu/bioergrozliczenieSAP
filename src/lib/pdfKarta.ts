@@ -97,7 +97,7 @@ export async function pdfKart(karty: KartaRemontowa[], kontekst: KontekstKarty, 
     doc.setTextColor(20)
 
     // Dane podstawowe - pary etykieta/wartość w 4 kolumnach
-    const krotkie = s.polaKarty.filter((p) => p.typ !== 'dlugi' && !['kontrola_wynik', 'kontrola_osoba', 'gwarancja_mies'].includes(p.klucz))
+    const krotkie = s.polaKarty.filter((p) => p.typ !== 'dlugi' && p.klucz !== 'gwarancja_mies')
     const wartoscPola = (klucz: string, typ: string) => {
       const w = k.dane[klucz]
       if (typ === 'tak_nie') return w === true ? 'TAK' : 'NIE'
@@ -113,7 +113,6 @@ export async function pdfKart(karty: KartaRemontowa[], kontekst: KontekstKarty, 
       ['Data przyjęcia', dataPL(k.data_przyjecia)],
       ['Data zakończenia', dataPL(k.data_zakonczenia)],
       [s.etykiety.mechanik_przekazujacy, k.mechanik_przekazujacy],
-      [s.etykiety.mechanik_przyjmujacy, k.mechanik_przyjmujacy],
       ...krotkie.map((p): [string, string] => [`${p.etykieta}${p.jednostka ? ` [${p.jednostka}]` : ''}`, wartoscPola(p.klucz, p.typ)]),
     ]
     const wiersze: string[][] = []
@@ -177,19 +176,17 @@ export async function pdfKart(karty: KartaRemontowa[], kontekst: KontekstKarty, 
       y = blokTekstu(doc, wartoscPola(p.klucz, p.typ), y + 1, 8)
     }
 
-    // Kontrola końcowa, gwarancja, podpisy
-    // Sekcja kontroli z podpisami zajmuje ~40 mm - stopka strony jest na 290 mm.
+    // Gwarancja i podpisy (bez kontroli końcowej - nie jest potrzebna do rozliczenia).
+    // Sekcja z podpisami zajmuje ~40 mm - stopka strony jest na 290 mm.
     if (y > 252) { doc.addPage(); y = 20 }
-    y = naglowekSekcji(doc, 'Kontrola końcowa i gwarancja', y)
+    y = naglowekSekcji(doc, 'Gwarancja i podpisy', y)
     doc.setFontSize(9)
-    doc.text(`Wynik kontroli: ${wartoscPola('kontrola_wynik', 'tekst') || '....................'}`, MARGINES + 2, y + 3)
-    doc.text(`Kontrolę przeprowadził: ${wartoscPola('kontrola_osoba', 'tekst') || '....................'}`, MARGINES + 75, y + 3)
     const gw = wartoscPola('gwarancja_mies', 'tekst')
-    doc.text(`Gwarancja: ${gw ? `${gw} mies.` : '..........'}`, MARGINES + 150, y + 3)
+    doc.text(`Gwarancja: ${gw ? `${gw} mies.` : '..........'}`, MARGINES + 2, y + 3)
     y += 17
 
-    const podpisy = [s.etykiety.mechanik_przekazujacy, s.etykiety.mechanik_przyjmujacy, 'Kontrola końcowa']
-    const szerP = (210 - 2 * MARGINES - 8) / 3
+    const podpisy = [s.etykiety.mechanik_przekazujacy, 'Bioerg']
+    const szerP = (210 - 2 * MARGINES - 4) / 2
     podpisy.forEach((etykieta, i) => {
       const x = MARGINES + i * (szerP + 4)
       doc.setDrawColor(120)

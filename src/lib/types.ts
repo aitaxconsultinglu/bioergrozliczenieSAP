@@ -125,6 +125,7 @@ export interface Zalacznik {
   nazwa_pliku: string
   sciezka: string
   rozmiar: number | null
+  utworzyl: string | null
   utworzono: string
 }
 

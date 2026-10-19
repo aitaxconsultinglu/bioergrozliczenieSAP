@@ -13,6 +13,7 @@ interface Props {
   zlecenieId: string | null
   zalaczniki: Zalacznik[]
   mozeDodacZalacznik: boolean
+  mozeUsunacZalacznik: (z: Zalacznik) => boolean
   odswiezZalaczniki: () => Promise<void>
 }
 
@@ -20,7 +21,7 @@ interface Props {
  * Usługi obce (praca zlecona firmie zewnętrznej) - refakturowane z narzutem (domyślnie 10%).
  * Do SAP obowiązkowo idzie skan faktury, więc przy każdej zapisanej usłudze można go wgrać.
  */
-export function TabelaUslugObcych({ uslugi, ustaw, edycja, zlecenieId, zalaczniki, mozeDodacZalacznik, odswiezZalaczniki }: Props) {
+export function TabelaUslugObcych({ uslugi, ustaw, edycja, zlecenieId, zalaczniki, mozeDodacZalacznik, mozeUsunacZalacznik, odswiezZalaczniki }: Props) {
   const { narzutUslugObcych } = useSlowniki()
   const zmien = (u: UslugaObca, z: Partial<UslugaObca>) => ustaw(uslugi.map((x) => (x === u ? { ...x, ...z } : x)))
   const dodaj = () => ustaw([...uslugi, {
@@ -79,7 +80,7 @@ export function TabelaUslugObcych({ uslugi, ustaw, edycja, zlecenieId, zalacznik
                     <td className="komorka">
                       {u.id ? (
                         <Zalaczniki kompaktowo zlecenieId={zlecenieId} zalaczniki={skany} typ="faktura_uslugi_obcej" uslugaObcaId={u.id}
-                          mozna={mozeDodacZalacznik} odswiez={odswiezZalaczniki} etykieta="Wgraj skan faktury" />
+                          mozna={mozeDodacZalacznik} mozeUsunac={mozeUsunacZalacznik} odswiez={odswiezZalaczniki} etykieta="Wgraj skan faktury" />
                       ) : <span className="text-xs text-slate-500">zapisz zlecenie, aby wgrać skan</span>}
                     </td>
                     <td className="komorka text-center">

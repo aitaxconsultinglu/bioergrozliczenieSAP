@@ -140,7 +140,11 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
   const [nrAzo, setNrAzo] = useState('')
   const [nrAzoZapisany, setNrAzoZapisany] = useState('')
   const idZapisanego = nowe ? null : idZrodla
-  const mozeDodacZalacznik = !!idZapisanego && (handlowiec || edycja)
+  // Skan karty / faktury można dołożyć na każdym etapie (kierownik widzi tylko swoje MPK) - papierową kartę
+  // produkcja często oddaje dopiero po złożeniu zlecenia. Usuwać: dopóki zlecenie jest edytowalne,
+  // a kierownik po złożeniu tylko własne pliki i tylko przed eksportem do SAP.
+  const mozeDodacZalacznik = true
+  const mozeUsunacZalacznik = (z: Zalacznik) => handlowiec || edycja || (z.utworzyl === profil.id && !zamkniete)
 
   const odswiezZalaczniki = useCallback(async () => {
     if (!idZapisanego) return
@@ -623,7 +627,8 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
       <section className="sekcja">
         <h3 className="mb-3 font-semibold">Usługi obce <span className="font-normal text-slate-500">(praca zlecona firmie zewnętrznej, refakturowana z narzutem)</span></h3>
         <TabelaUslugObcych uslugi={uslugiObce} ustaw={ustaw('uslugiObce')} edycja={edycja} zlecenieId={idZapisanego}
-          zalaczniki={zalaczniki} mozeDodacZalacznik={mozeDodacZalacznik} odswiezZalaczniki={odswiezZalaczniki} />
+          zalaczniki={zalaczniki} mozeDodacZalacznik={mozeDodacZalacznik} mozeUsunacZalacznik={mozeUsunacZalacznik}
+          odswiezZalaczniki={odswiezZalaczniki} />
       </section>
 
       <section className="sekcja">
@@ -631,7 +636,8 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
         <KartyRemontowe karty={karty} ustaw={ustaw('karty')} wymagane={wymaganeKarty} szablonZlecenia={naglowek.szablon}
           nazwaZlecenia={naglowek.nazwa} mechanik={naglowek.mechanik} numerKarty={numerKarty} edycja={edycja}
           pdf={(k) => void pobierzPdf(k)} skany={zalaczniki.filter((z) => z.typ === 'karta_remontowa')} zlecenieId={idZapisanego}
-          mozeDodacZalacznik={mozeDodacZalacznik} odswiezZalaczniki={odswiezZalaczniki} silniki={silniki} />
+          mozeDodacZalacznik={mozeDodacZalacznik} mozeUsunacZalacznik={mozeUsunacZalacznik} odswiezZalaczniki={odswiezZalaczniki}
+          zapiszNowe={nowe ? { zapisz: zapiszWBazie, otworz: otworzInne } : undefined} silniki={silniki} />
       </section>
 
       <section className="sekcja">

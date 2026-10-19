@@ -27,7 +27,10 @@ interface Props {
   skany: Zalacznik[]
   zlecenieId: string | null
   mozeDodacZalacznik: boolean
+  mozeUsunacZalacznik: (z: Zalacznik) => boolean
   odswiezZalaczniki: () => Promise<void>
+  /** Nowe zlecenie: wgranie skanu najpierw zapisuje je jako robocze. */
+  zapiszNowe?: { zapisz: () => Promise<string | null>; otworz: (id: string) => void }
   /** Silniki z pozycji cennika - po jednym wpisie na sztukę. */
   silniki: SilnikZPozycji[]
 }
@@ -49,7 +52,7 @@ export function nowaKarta(szablonId: string, numer: string, nazwa: string, mecha
 }
 
 export function KartyRemontowe({ karty, ustaw, wymagane, szablonZlecenia, nazwaZlecenia, mechanik, numerKarty, edycja, pdf,
-  skany, zlecenieId, mozeDodacZalacznik, odswiezZalaczniki, silniki }: Props) {
+  skany, zlecenieId, mozeDodacZalacznik, mozeUsunacZalacznik, odswiezZalaczniki, zapiszNowe, silniki }: Props) {
   const kartWSkanach = skany.reduce((s, z) => s + z.liczba_kart, 0)
   const brakuje = Math.max(0, wymagane - karty.length - kartWSkanach)
 
@@ -91,10 +94,12 @@ export function KartyRemontowe({ karty, ustaw, wymagane, szablonZlecenia, nazwaZ
       <div className="rounded-md border border-dashed border-slate-300 p-3">
         <p className="mb-1 text-sm font-medium">Skan karty remontowej (PDF)</p>
         <p className="mb-2 text-xs text-slate-500">
-          Karta wypełniona odręcznie na stanowisku remontu? Wgraj jej skan - liczy się jak wypełniona karta. Jeśli w jednym pliku jest kilka kart, ustaw ich liczbę.
+          Karta wypełniona odręcznie na produkcji (własny wzór Bioerg)? Wgraj jej skan - liczy się jak wypełniona karta,
+          więc nie trzeba wypełniać karty w aplikacji. Jeśli w jednym pliku jest kilka kart, ustaw ich liczbę.
+          Skan można dołożyć także po złożeniu zlecenia.
         </p>
         <Zalaczniki zlecenieId={zlecenieId} zalaczniki={skany} typ="karta_remontowa" mozna={mozeDodacZalacznik}
-          odswiez={odswiezZalaczniki} etykieta="Wgraj skan karty (PDF / zdjęcie)" liczbaKart />
+          mozeUsunac={mozeUsunacZalacznik} zapiszNowe={zapiszNowe} odswiez={odswiezZalaczniki} etykieta="Wgraj skan karty (PDF / zdjęcie)" liczbaKart />
       </div>
 
       {karty.map((k, i) => (
@@ -164,7 +169,6 @@ function Karta({ karta, nr, edycja, zmien, usun, pdf, silniki }: {
         {poleTekstowe('data_zakonczenia', 'Data zakończenia', 'date', true)}
         <div />
         {poleTekstowe('mechanik_przekazujacy', s.etykiety.mechanik_przekazujacy)}
-        {poleTekstowe('mechanik_przyjmujacy', s.etykiety.mechanik_przyjmujacy, 'text', true)}
         <label className="block sm:col-span-2">
           <span className="etykieta">{s.etykiety.opis_uszkodzenia}</span>
           <textarea className="pole" rows={2} disabled={!edycja} value={karta.opis_uszkodzenia}

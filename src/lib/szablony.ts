@@ -44,8 +44,6 @@ export interface Szablon {
   doplaty: { opis: string; proc: number }[]
 }
 
-const WYNIK_KONTROLI = ['pozytywny', 'negatywny', 'warunkowo pozytywny']
-
 export const SZABLONY: Record<string, Szablon> = {
   urzadzenie: {
     id: 'urzadzenie',
@@ -63,8 +61,6 @@ export const SZABLONY: Record<string, Szablon> = {
     polaKarty: [
       { klucz: 'miejsce_pracy', etykieta: 'Miejsce pracy urządzenia (budynek / instalacja)', typ: 'tekst' },
       { klucz: 'wykonane_elementy', etykieta: 'Wykonane elementy / części dorobione', typ: 'dlugi', szerokie: true },
-      { klucz: 'kontrola_wynik', etykieta: 'Kontrola końcowa - wynik', typ: 'wybor', opcje: WYNIK_KONTROLI, wymagane: true },
-      { klucz: 'kontrola_osoba', etykieta: 'Kontrolę przeprowadził', typ: 'tekst', wymagane: true },
       { klucz: 'gwarancja_mies', etykieta: 'Gwarancja', typ: 'liczba', jednostka: 'mies.' },
       { klucz: 'uwagi', etykieta: 'Uwagi', typ: 'dlugi', szerokie: true },
     ],
@@ -141,8 +137,6 @@ export const SZABLONY: Record<string, Szablon> = {
     polaKarty: [
       { klucz: 'miejsce_pracy', etykieta: 'Miejsce (budynek / instalacja)', typ: 'tekst' },
       { klucz: 'wykonane_prace', etykieta: 'Wykonane prace', typ: 'dlugi', szerokie: true },
-      { klucz: 'kontrola_wynik', etykieta: 'Kontrola końcowa - wynik', typ: 'wybor', opcje: WYNIK_KONTROLI },
-      { klucz: 'kontrola_osoba', etykieta: 'Kontrolę przeprowadził', typ: 'tekst' },
       { klucz: 'uwagi', etykieta: 'Uwagi', typ: 'dlugi', szerokie: true },
     ],
     zakresRemontu: [],
@@ -156,12 +150,15 @@ export function szablon(id: string | null | undefined): Szablon {
   return SZABLONY[id ?? ''] ?? SZABLONY[SZABLON_DOMYSLNY]
 }
 
-/** Lista brakujących pól karty (wspólnych i z szablonu) - pusta = karta kompletna. */
+/**
+ * Lista brakujących pól karty (wspólnych i z szablonu) - pusta = karta kompletna.
+ * Osoba przyjmująca i kontrola końcowa nie są wymagane (uwaga kierownika 2026-10-19) - zostaje tylko
+ * to, co potrzebne do rozliczenia; resztę zawiera papierowa karta produkcji.
+ */
 export function brakiKarty(k: {
   numer_karty: string
   urzadzenie_nazwa: string
   data_zakonczenia: string
-  mechanik_przyjmujacy: string
   szablon: string
   dane: Record<string, unknown>
 }): string[] {
@@ -170,7 +167,6 @@ export function brakiKarty(k: {
   if (!k.numer_karty.trim()) braki.push('numer karty')
   if (!k.urzadzenie_nazwa.trim()) braki.push(s.etykiety.urzadzenie_nazwa.toLowerCase())
   if (!k.data_zakonczenia) braki.push('data zakończenia')
-  if (!k.mechanik_przyjmujacy.trim()) braki.push(s.etykiety.mechanik_przyjmujacy.toLowerCase())
   for (const p of s.polaKarty) {
     if (!p.wymagane) continue
     const w = k.dane[p.klucz]
