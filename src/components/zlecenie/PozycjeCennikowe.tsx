@@ -3,7 +3,7 @@ import { FileWarning, PenLine, Search, Trash2 } from 'lucide-react'
 import { useSlowniki } from '@/lib/slowniki'
 import { zl } from '@/lib/format'
 import { cenaUslugi, nowyKlucz, wartoscUslugi } from '@/lib/obliczenia'
-import { INDEKS_MATERIALU } from '@/lib/eksportSap'
+import { INDEKS_MATERIALU, INDEKS_MATERIALU_CENNIK } from '@/lib/eksportSap'
 import { szablon } from '@/lib/szablony'
 import type { PozycjaUslugi } from '@/lib/types'
 import { PoleLiczby } from '../PoleLiczby'
@@ -33,7 +33,7 @@ export function PozycjeCennikowe({ uslugi, ustaw, szablonZlecenia, edycja }: Pro
 
   // Stawki godzinowe są w siatce robocizny, a materiał w tabeli materiałów.
   const doWyboru = useMemo(
-    () => pozycje.filter((p) => p.aktywna && !idStawek.has(p.id) && p.indeks_sap !== INDEKS_MATERIALU),
+    () => pozycje.filter((p) => p.aktywna && !idStawek.has(p.id) && p.indeks_sap !== INDEKS_MATERIALU_CENNIK && p.indeks_sap !== INDEKS_MATERIALU),
     [pozycje, idStawek],
   )
 

@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { supabase } from './supabase'
 import type { Kategoria, PozycjaCennika, Stawka } from './types'
-import { INDEKS_MATERIALU, type MaterialWgKategorii } from './eksportSap'
+import { INDEKS_MATERIALU_CENNIK, type MaterialWgKategorii } from './eksportSap'
 
 interface Slowniki {
   kategorie: Map<number, Kategoria>
@@ -81,7 +81,7 @@ export function DostawcaSlownikow({ children }: { children: ReactNode }) {
   const wartosc = useMemo<Slowniki>(() => {
     const materialWgKategorii: MaterialWgKategorii = new Map()
     for (const p of pozycje) {
-      if (p.indeks_sap === INDEKS_MATERIALU) materialWgKategorii.set(p.nr_pozycji, p)
+      if (p.indeks_sap === INDEKS_MATERIALU_CENNIK) materialWgKategorii.set(p.nr_pozycji, p)
     }
     return {
       kategorie: new Map(kategorie.map((k) => [k.nr_pozycji, k])),

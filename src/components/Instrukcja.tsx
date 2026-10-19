@@ -177,7 +177,7 @@ export function Instrukcja({ profil }: { profil: Profil }) {
             </Krok>
           </ol>
           <Uwaga>
-            Układ eksportu jest wstępny: numer linii z zamówienia (wpisany przez kierownika albo pusty), materiał jako pozycja 5004062 z ilością = wartość z narzutem po 1 zł.
+            Układ eksportu jest wstępny: numer linii z zamówienia (wpisany przez kierownika albo pusty), materiał jako pozycja 5005843 (od narzutu 12%; wcześniej 5004062) z ilością = wartość z narzutem po 1 zł.
             Sprawdź go na pierwszych zleceniach i zgłoś, czym różni się od tego, co faktycznie wklejasz do SAP. Poprawka jest szybka.
           </Uwaga>
         </section>

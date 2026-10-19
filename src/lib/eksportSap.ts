@@ -11,8 +11,9 @@
  *     zamówienia (potwierdzone przez dział handlowy 2026-10-13), więc NIE pochodzi z cennika.
  *     Bierzemy go z pozycji (nr_linii_sap), a gdy pusty - z numeru linii zlecenia dla usług
  *     (linia_uslugi) albo materiałów (linia_materialy). Brak = pusta komórka do uzupełnienia w SAP.
- *  2. Materiał idzie pod uniwersalną usługę "Materiał branża mechaniczna +15%" (5004062)
- *     z ceną cennikową 1 zł/JD, więc Ilość = wartość z narzutem, Cena = 1.
+ *  2. Materiał idzie pod uniwersalną usługę materiałową z ceną 1 zł/JD. Od wprowadzenia narzutu 12%
+ *     indeks SAP to 5005843 (wcześniej 5004062 "Materiał branża mechaniczna +15%" - pod tym starym
+ *     indeksem pozycje materiałowe wciąż są w cenniku, stąd osobna stała do ich rozpoznawania), więc Ilość = wartość z narzutem, Cena = 1.
  *     Dodatkowo wypełniamy Cena Mat. (cena jedn. z narzutem) i Ilość Mat. (sztuki),
  *     a Krótki tekst = nazwa materiału (max 40 znaków - limit krótkiego tekstu SAP).
  *  3. Dopłata procentowa (przezwojenie +10%) jest wliczona w cenę pozycji.
@@ -36,7 +37,10 @@ export const KOLUMNY_SAP = [
 export type KomorkaSap = string | number | null
 export type WierszSap = [number | null, string, string, number, null, string, number, number, number | null, number | null, null]
 
-export const INDEKS_MATERIALU = '5004062'
+/** Indeks SAP, pod którym eksportujemy materiał (narzut 12%, zmiana 2026-10-19). */
+export const INDEKS_MATERIALU = '5005843'
+/** Stary indeks materiału (+15%) - tak są oznaczone pozycje materiałowe w cenniku z umowy. */
+export const INDEKS_MATERIALU_CENNIK = '5004062'
 export const INDEKS_USLUGI_OBCEJ = '5001720'
 export const GRUPA_ROBOCIZNY = 310
 const MAKS_KROTKI_TEKST = 40
@@ -84,7 +88,7 @@ export interface ZlecenieDoEksportu {
   }[]
 }
 
-/** Wszystkie pozycje materiałowe cennika (5004062) wg kategorii - do wyboru numeru linii. */
+/** Wszystkie pozycje materiałowe cennika (stary indeks 5004062) wg kategorii - do wyboru numeru linii. */
 export type MaterialWgKategorii = Map<number, PozycjaCennika>
 
 /**

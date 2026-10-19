@@ -717,7 +717,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
             return (
               <p className="mt-2 rounded bg-slate-50 px-3 py-2 text-xs text-slate-600">
                 Materiał: zakup <strong>{zl(zakup)} zł</strong> + narzut <strong>{zl(grosze(razem - zakup))} zł</strong> = <strong>{zl(razem)} zł</strong>.
-                W SAP idzie pod usługą 5004062 (cena cennikowa 1 zł/JD), więc „Ilość” = wartość z narzutem, a „Cena Mat.” = cena jednostkowa z narzutem.
+                W SAP idzie pod usługą 5005843 (cena cennikowa 1 zł/JD), więc „Ilość” = wartość z narzutem, a „Cena Mat.” = cena jednostkowa z narzutem.
               </p>
             )
           })()}

@@ -65,11 +65,11 @@ describe('eksport SAP', () => {
     expect(wiersze[1].slice(0, 2)).toEqual([30, '5000032']) // nr linii z pozycji nadpisuje linię zlecenia
   })
   it('materiał pod numerem linii materiałów z zamówienia, ilość = wartość z narzutem, cena 1', () => {
-    expect(wiersze[2]).toEqual([20, '5004062', 'SIMMERING 35X55X10', 96.03, null, 'JD', 1, 96.03, 9.6, 10, null])
+    expect(wiersze[2]).toEqual([20, '5005843', 'SIMMERING 35X55X10', 96.03, null, 'JD', 1, 96.03, 9.6, 10, null])
   })
   it('materiał Synthos nie trafia do eksportu', () => expect(wiersze).toHaveLength(3))
   it('schowek: tabulatory, przecinek dziesiętny, bez nagłówka', () => {
-    expect(tekstDoSchowka([wiersze[2]])).toBe('20\t5004062\tSIMMERING 35X55X10\t96,03\t\tJD\t1\t96,03\t9,6\t10\t')
+    expect(tekstDoSchowka([wiersze[2]])).toBe('20\t5005843\tSIMMERING 35X55X10\t96,03\t\tJD\t1\t96,03\t9,6\t10\t')
   })
 })
 
@@ -108,7 +108,7 @@ describe('arkusz Szczegóły w XLSX', () => {
       pozycje_materialowe: [{ nazwa: 'ŁOŻYSKO TEST', ilosc: 1, jm: 'szt', wartosc_zakupu: 73.91, narzut_proc: 12, dostawca: 'bioerg', kolejnosc: 0, numer_faktury: 'PZ/1/01/2026' }],
     })
     expect(w[0].slice(3, 4)).toEqual(['Robocizna wg rbg'])
-    expect(w[1]).toEqual(['4200112773', 'POMPA', 'P04', 'Materiał', 20, '5004062', 'ŁOŻYSKO TEST', 1, 'szt',
+    expect(w[1]).toEqual(['4200112773', 'POMPA', 'P04', 'Materiał', 20, '5005843', 'ŁOŻYSKO TEST', 1, 'szt',
       82.78, 82.78, 73.91, 12, 8.87, 'PZ/1/01/2026', 'Bioerg'])
   })
 })
