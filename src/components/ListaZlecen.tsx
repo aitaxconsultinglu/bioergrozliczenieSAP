@@ -162,7 +162,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
 
   const doPoprawki = wiersze.filter((w) => w.status === 'zwrocony').length
   const wybrane = widoczne.filter((w) => zaznaczone.has(w.id))
-  const doZakonczenia = widoczne.filter((w) => w.status === 'wyeksportowany')
+  const doZakonczenia = widoczne.filter((w) => w.status === 'wyeksportowany' || w.status === 'braki_zgloszone')
   const wszystkieZaznaczone = doZakonczenia.length > 0 && doZakonczenia.every((w) => zaznaczone.has(w.id))
 
   async function zakoncz() {
@@ -283,7 +283,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
               <tr key={w.id} onClick={() => otworz(w.id)} className={cn('cursor-pointer hover:bg-limonka-jasna/40', zaznaczone.has(w.id) && 'bg-limonka-jasna/40')}>
                 {handlowiec && (
                   <td className="komorka text-center" onClick={(e) => e.stopPropagation()}>
-                    {w.status === 'wyeksportowany' && (
+                    {(w.status === 'wyeksportowany' || w.status === 'braki_zgloszone') && (
                       <input type="checkbox" aria-label="Zaznacz do zakończenia" checked={zaznaczone.has(w.id)}
                         onChange={() => setZaznaczone((s) => { const n = new Set(s); if (n.has(w.id)) n.delete(w.id); else n.add(w.id); return n })} />
                     )}

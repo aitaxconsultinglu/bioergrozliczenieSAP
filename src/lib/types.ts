@@ -1,5 +1,5 @@
 export type Rola = 'kierownik' | 'handlowiec'
-export type StatusZlecenia = 'roboczy' | 'zlozony' | 'zwrocony' | 'wyeksportowany' | 'zakonczony'
+export type StatusZlecenia = 'roboczy' | 'zlozony' | 'zwrocony' | 'wyeksportowany' | 'braki_zgloszone' | 'zakonczony'
 export type StatusBraku = 'zgloszony' | 'uzupelniony' | 'rozliczony'
 /** 'bioerg', 'synthos' albo dowolny wpisany tekst (lista jest otwarta). */
 export type Dostawca = string

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, CheckCheck, ClipboardCopy, Copy, FileSpreadsheet, Printer, RotateCcw, Save, Send, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, CheckCheck, CircleAlert, ClipboardCopy, Copy, FileSpreadsheet, Printer, RotateCcw, Save, Send, Trash2, Undo2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useSlowniki } from '@/lib/slowniki'
 import { komunikatPL } from '@/lib/config'
@@ -132,7 +132,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
   const [potwierdzWycofanie, setPotwierdzWycofanie] = useState(false)
 
   const status: StatusZlecenia = meta?.status ?? 'roboczy'
-  const zamkniete = status === 'wyeksportowany' || status === 'zakonczony'
+  const zamkniete = status === 'wyeksportowany' || status === 'braki_zgloszone' || status === 'zakonczony'
   const edycja = nowe || (handlowiec ? !zamkniete : status === 'roboczy' || status === 'zwrocony')
   const { naglowek, uslugi, materialy, karty, braki, uslugiObce } = stan
   const [zalaczniki, setZalaczniki] = useState<Zalacznik[]>([])
@@ -396,17 +396,22 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
     zamknij()
   }
 
-  async function zmienStatus() {
-    if (!idZrodla || !zmianaStatusu.status) return
-    setZajety(true)
-    const { error } = await supabase.rpc('zmien_status_zlecenia', { p_id: idZrodla, p_status: zmianaStatusu.status, p_powod: zmianaStatusu.powod })
+  /** Zmiana statusu przez dział handlowy - powód jest opcjonalny (zapisuje się w historii, jeśli podany). */
+  async function ustawStatus(nowyStatus: StatusZlecenia, powod = '') {
+    if (!idZrodla) return false
+    setBlad(null); setKomunikat(null); setZajety(true)
+    const { error } = await supabase.rpc('zmien_status_zlecenia', { p_id: idZrodla, p_status: nowyStatus, p_powod: powod })
     setZajety(false)
-    if (error) { setBlad(komunikatPL(error.message)); return }
-    const nowy = ETYKIETY_STATUSU[zmianaStatusu.status]
-    setZmianaStatusu({ otwarta: false, status: '', powod: '' })
+    if (error) { setBlad(komunikatPL(error.message)); return false }
     setWpisyAudytu(null)
     await wczytaj(idZrodla)
-    setKomunikat(`Status zmieniony na „${nowy}”. Powód zapisano w historii zmian.`)
+    setKomunikat(`Status zmieniony na „${ETYKIETY_STATUSU[nowyStatus]}”.${powod.trim() ? ' Powód zapisano w historii zmian.' : ''}`)
+    return true
+  }
+
+  async function zmienStatus() {
+    if (!zmianaStatusu.status) return
+    if (await ustawStatus(zmianaStatusu.status, zmianaStatusu.powod)) setZmianaStatusu({ otwarta: false, status: '', powod: '' })
   }
 
   async function zakonczZlecenie() {
@@ -515,6 +520,8 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
             ? `Zlecenie zakończone ${dataGodzinaPL(meta?.zakonczono)} - tylko do odczytu.`
             : status === 'wyeksportowany'
             ? `Zlecenie wyeksportowane do SAP ${dataGodzinaPL(meta?.wyeksportowano)} - tylko do odczytu.`
+            : status === 'braki_zgloszone'
+            ? `Zlecenie wyeksportowane do SAP ${dataGodzinaPL(meta?.wyeksportowano)}, braki zgłoszone do SAP - tylko do odczytu.`
             : `Zlecenie złożone do rozliczenia ${dataGodzinaPL(meta?.zlozono)} - edycja zablokowana. Jeśli trzeba coś zmienić, poproś dział handlowy o zwrot do poprawki.`}
         </div>
       )}
@@ -776,6 +783,11 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
               <Button disabled={zajety} onClick={() => void cofnijEksport()}><Undo2 className="h-4 w-4" /> Cofnij eksport</Button>
             )}
             {handlowiec && status === 'wyeksportowany' && (
+              <Button disabled={zajety} onClick={() => void ustawStatus('braki_zgloszone')} title="Braki (np. godzin) zgłoszone w SAP - czekają na uzupełnienie">
+                <CircleAlert className="h-4 w-4" /> Braki zgłoszone do SAP
+              </Button>
+            )}
+            {handlowiec && (status === 'wyeksportowany' || status === 'braki_zgloszone') && (
               <Button wariant="glowny" disabled={zajety} onClick={() => void zakonczZlecenie()} title="Zamknij zlecenie po rozliczeniu">
                 <CheckCheck className="h-4 w-4" /> Zakończ
               </Button>
@@ -822,8 +834,8 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
         <DialogContent>
           <DialogTitle>Zmiana statusu zlecenia</DialogTitle>
           <DialogDescription>
-            Obecny status: <strong>{ETYKIETY_STATUSU[status]}</strong>. Użyj, gdy status ustawiono przez pomyłkę.
-            Zmiana i powód zapiszą się w historii zlecenia.
+            Obecny status: <strong>{ETYKIETY_STATUSU[status]}</strong>. Zmiana zapisze się w historii zlecenia.
+            Powód możesz dopisać, ale nie musisz.
           </DialogDescription>
           <div className="mt-4 grid gap-2">
             {(Object.keys(ETYKIETY_STATUSU) as StatusZlecenia[]).map((s) => (
@@ -841,16 +853,16 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
             <p className="mt-2 text-xs text-slate-500">Przy przejściu na „złożony” aplikacja sprawdzi numer zamówienia i karty remontowe, tak jak przy zwykłym złożeniu.</p>
           )}
           {zmianaStatusu.status === 'zwrocony' && (
-            <p className="mt-2 text-xs text-slate-500">Powód zobaczy kierownik jako komentarz „do poprawki”.</p>
+            <p className="mt-2 text-xs text-slate-500">Wpisany powód zobaczy kierownik jako komentarz „do poprawki”.</p>
           )}
           <label className="mt-3 block">
-            <span className="etykieta">Powód zmiany <span className="text-red-600">*</span></span>
+            <span className="etykieta">Powód zmiany <span className="font-normal text-slate-500">(opcjonalnie)</span></span>
             <textarea className="pole" rows={2} value={zmianaStatusu.powod} placeholder="np. oznaczone jako wyeksportowane przez pomyłkę"
               onChange={(e) => setZmianaStatusu((z) => ({ ...z, powod: e.target.value }))} />
           </label>
           <div className="mt-4 flex justify-end gap-2">
             <Button onClick={() => setZmianaStatusu({ otwarta: false, status: '', powod: '' })}>Anuluj</Button>
-            <Button wariant="glowny" disabled={zajety || !zmianaStatusu.status || !zmianaStatusu.powod.trim()} onClick={() => void zmienStatus()}>
+            <Button wariant="glowny" disabled={zajety || !zmianaStatusu.status} onClick={() => void zmienStatus()}>
               Zmień status
             </Button>
           </div>
