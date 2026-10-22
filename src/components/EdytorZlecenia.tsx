@@ -169,12 +169,14 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
     }
     const s = zBazy(data)
     if (kopia) {
-      // Kopia: ten sam typ pracy (nagłówek + pozycje cennikowe + robocizna), bez numeru
-      // zamówienia, dat, materiałów z faktur, kart i braków - to zawsze nowe dane.
+      // Kopia: ten sam typ pracy (nagłówek + pozycje cennikowe + robocizna + materiały z ilością,
+      // ceną, narzutem i dokumentem zakupu - prośba działu handlowego 2026-10-22), bez numeru
+      // zamówienia, dat, kart, braków i usług obcych - to zawsze nowe dane.
       const nowy: Stan = {
         naglowek: { ...s.naglowek, nr_zamowienia: '', pozycja_zamowienia: '', linia_uslugi: '', linia_materialy: '', data_przyjecia: '', data_zakonczenia: '', uwagi: '' },
         uslugi: s.uslugi.map((u) => ({ ...u, id: undefined, cena: undefined, nr_linii_sap: null, klucz: nowyKlucz() })),
-        materialy: [], karty: [], braki: [], uslugiObce: [],
+        materialy: s.materialy.map((m) => ({ ...m, id: undefined, klucz: nowyKlucz() })),
+        karty: [], braki: [], uslugiObce: [],
       }
       setStan(nowy)
       setZapisany('')
@@ -500,7 +502,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
           <span className={cn('rounded px-2 py-0.5 text-xs ring-1', KOLORY_STATUSU[status])}>{ETYKIETY_STATUSU[status]}</span>
         )}
         <div className="ml-auto flex flex-wrap gap-2">
-          {!nowe && <Button onClick={() => otworzInne(`kopia:${idZrodla}`)} title="Nowe zlecenie z tym samym nagłówkiem i pozycjami"><Copy className="h-4 w-4" /> Kopiuj jako nowe</Button>}
+          {!nowe && <Button onClick={() => otworzInne(`kopia:${idZrodla}`)} title="Nowe zlecenie z tym samym nagłówkiem, pozycjami i materiałami"><Copy className="h-4 w-4" /> Kopiuj jako nowe</Button>}
           <Button onClick={() => void pobierzXlsx()} title="Linie SAP + szczegóły rozliczenia (cennik, roboczogodziny, materiał)"><FileSpreadsheet className="h-4 w-4" /> XLSX</Button>
           {!nowe && <Button onClick={() => window.print()}><Printer className="h-4 w-4" /> Drukuj</Button>}
           {!nowe && ((handlowiec && !zamkniete) || (!handlowiec && status === 'roboczy')) && (

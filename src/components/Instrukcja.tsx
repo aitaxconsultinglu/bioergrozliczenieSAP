@@ -67,7 +67,7 @@ export function Instrukcja({ profil }: { profil: Profil }) {
         <ol className="space-y-2">
           <Krok nr={1} tytul="Nowe zlecenie">
             <p>„Moje zlecenia” → <strong>Nowe zlecenie</strong>. Gdy robisz kolejny remont tego samego typu (np. znowu pompa 3X9K),
-              otwórz poprzednie i kliknij <strong>„Kopiuj jako nowe”</strong>. Przepisze się nagłówek i pozycje, a numer zamówienia, materiały i karty wpisujesz na nowo.</p>
+              otwórz poprzednie i kliknij <strong>„Kopiuj jako nowe”</strong>. Przepisze się nagłówek, pozycje i materiały (z ilością, ceną, narzutem i dokumentem zakupu - popraw je, jeśli tym razem były inne), a numer zamówienia i karty wpisujesz na nowo.</p>
           </Krok>
           <Krok nr={2} tytul="Dane zlecenia (to, co było na górze karty w Excelu)">
             <p><strong>Nazwa</strong>: np. „POMPA 3X9K NR 422”. <strong>Nr zamówienia SAP</strong>: numer 4200… z FIORI. Aplikacja podpowiada numery wpisane wcześniej.
