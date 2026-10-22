@@ -154,6 +154,7 @@ export function Instrukcja({ profil }: { profil: Profil }) {
             </Krok>
             <Krok nr="3b" tytul="Filtry i kosz">
               <p>Na liście zleceń przy każdym nagłówku jest ikonka lejka: wybierasz wartości z kolumny (np. konto, MPK, status, miesiąc zmiany), jak w Excelu.
+                Pod tabelą jest <strong>suma wartości</strong>: po zawężeniu filtrami (wyszukiwarka, status, MPK, lejki) pokazuje sumę widocznych zleceń, a pod nią sumę wszystkich.
                 Usunięte zlecenia trafiają do zakładki <strong>„Kosz”</strong> - przycisk „Przywróć” odtwarza je razem z pozycjami, materiałami, kartami i załącznikami.</p>
             </Krok>
             <Krok nr={4} tytul="Poprawki">

@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useSlowniki } from '@/lib/slowniki'
 import { komunikatPL } from '@/lib/config'
 import { ETYKIETY_STATUSU, KOLEJNOSC_STATUSU, KOLORY_STATUSU, dataGodzinaPL, zl } from '@/lib/format'
-import { policzSumy } from '@/lib/obliczenia'
+import { grosze, policzSumy } from '@/lib/obliczenia'
 import type { Dostawca, Profil, StatusZlecenia } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Button } from './ui/button'
@@ -161,6 +161,11 @@ export function ListaZlecen({ profil, otworz }: Props) {
     setFiltry((f) => { const n = { ...f }; if (w === null) delete n[k]; else n[k] = w; return n })
 
   const doPoprawki = wiersze.filter((w) => w.status === 'zwrocony').length
+  const suma = (lista: Wiersz[]) => grosze(lista.reduce((s, w) => s + w.wartosc, 0))
+  const sumaWidocznych = suma(widoczne)
+  const sumaWszystkich = suma(wiersze)
+  const zawezone = widoczne.length !== wiersze.length
+  const kolumnPrzedWartoscia = handlowiec ? 8 : 7
   const wybrane = widoczne.filter((w) => zaznaczone.has(w.id))
   const doZakonczenia = widoczne.filter((w) => w.status === 'wyeksportowany' || w.status === 'braki_zgloszone')
   const wszystkieZaznaczone = doZakonczenia.length > 0 && doZakonczenia.every((w) => zaznaczone.has(w.id))
@@ -249,7 +254,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
 
       {handlowiec && doZakonczenia.length > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm">
-          <span>Zaznaczono <strong>{wybrane.length}</strong> zleceń wyeksportowanych do SAP.</span>
+          <span>Zaznaczono <strong>{wybrane.length}</strong> zleceń wyeksportowanych do SAP{wybrane.length > 0 && <> na kwotę <strong>{zl(suma(wybrane))} zł</strong></>}.</span>
           <Button className="ml-auto" disabled={!wybrane.length || zajety} onClick={() => setPotwierdzZakonczenie(true)}>
             <CheckCheck className="h-4 w-4" /> Oznacz jako zakończone
           </Button>
@@ -316,6 +321,24 @@ export function ListaZlecen({ profil, otworz }: Props) {
               <tr><td colSpan={handlowiec ? 10 : 9} className="komorka py-8 text-center text-slate-500">Brak zleceń.</td></tr>
             )}
           </tbody>
+          {!ladowanie && wiersze.length > 0 && (
+            <tfoot>
+              <tr className="bg-slate-50 font-semibold">
+                <td colSpan={kolumnPrzedWartoscia} className="komorka text-right">
+                  {zawezone ? `Suma po filtrach (${widoczne.length} z ${wiersze.length} zleceń)` : `Suma wszystkich zleceń (${wiersze.length})`}
+                </td>
+                <td className="komorka liczba whitespace-nowrap">{zl(sumaWidocznych)}</td>
+                <td className="komorka" />
+              </tr>
+              {zawezone && (
+                <tr className="bg-slate-50 text-slate-600">
+                  <td colSpan={kolumnPrzedWartoscia} className="komorka text-right">Suma wszystkich zleceń ({wiersze.length})</td>
+                  <td className="komorka liczba whitespace-nowrap">{zl(sumaWszystkich)}</td>
+                  <td className="komorka" />
+                </tr>
+              )}
+            </tfoot>
+          )}
         </table>
       </div>
       {ladowanie && <p className="text-sm text-slate-500">Wczytywanie...</p>}
