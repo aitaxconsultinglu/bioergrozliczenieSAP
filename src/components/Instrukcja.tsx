@@ -76,6 +76,8 @@ export function Instrukcja({ profil }: { profil: Profil }) {
             <p><strong>Rodzaj karty</strong>: pompa/urządzenie, silnik elektryczny albo „inne” dla nietypowej pracy.</p>
             <p><strong>Nr linii zam. - usługi / materiały</strong>: numery linii nadaje Synthos przy tworzeniu zamówienia w SAP (często 10 dla usług i 20 dla materiału). Przepisz je z zamówienia.
               Jeśli ich nie znasz, zostaw puste - dział handlowy uzupełni je w SAP. Inny numer dla pojedynczej pozycji wpiszesz w kolumnie „Nr linii”.</p>
+            <p><strong>Dokument</strong>: jaki dokument jest potrzebny do rozliczenia - karta remontowa (albo od razu jej numer), protokół z wyważania, protokół pomiarów itp.
+              Dział handlowy widzi to pole na liście zleceń (kolumna „Dokument”, z filtrem) i od razu wie, czy zlecenie jest kompletne.</p>
           </Krok>
           <Krok nr={3} tytul="Robocizna wg cennika">
             <p>Wpisz w wyszukiwarkę fragment nazwy z umowy, np. <em>„3x9k”</em>, <em>„siln 7,5 1400”</em> albo <em>„uszczelek”</em>, i kliknij pozycję.

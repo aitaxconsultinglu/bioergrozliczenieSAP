@@ -20,6 +20,7 @@ interface Wiersz {
   mechanik: string | null
   konto: string | null
   nr_azo: string | null
+  dokument: string | null
   status: StatusZlecenia
   zmodyfikowano: string
   komentarz_handlowca: string | null
@@ -29,7 +30,7 @@ interface Wiersz {
   wartosc: number
 }
 
-type Kolumna = 'nr' | 'azo' | 'konto' | 'nazwa' | 'mpk' | 'mechanik' | 'status' | 'wartosc' | 'zmieniono'
+type Kolumna = 'nr' | 'azo' | 'konto' | 'nazwa' | 'mpk' | 'mechanik' | 'status' | 'dokument' | 'wartosc' | 'zmieniono'
 interface Sortowanie { kolumna: Kolumna; rosnaco: boolean }
 
 const KLUCZ_SORTOWANIA = 'rozliczenia.lista.sortowanie'
@@ -57,6 +58,7 @@ function porownaj(a: Wiersz, b: Wiersz, k: Kolumna): number {
     case 'mpk': return tekst(a.mpk, b.mpk)
     case 'mechanik': return tekst(a.mechanik, b.mechanik)
     case 'status': return KOLEJNOSC_STATUSU[a.status] - KOLEJNOSC_STATUSU[b.status]
+    case 'dokument': return tekst(a.dokument, b.dokument)
     case 'wartosc': return a.wartosc - b.wartosc
     case 'zmieniono': return a.zmodyfikowano.localeCompare(b.zmodyfikowano)
   }
@@ -74,6 +76,7 @@ function wartoscDoFiltra(w: Wiersz, k: KolumnaFiltra): string {
     case 'mpk': return w.mpk
     case 'mechanik': return w.mechanik?.trim() || PUSTE
     case 'status': return ETYKIETY_STATUSU[w.status]
+    case 'dokument': return w.dokument?.trim() || PUSTE
     case 'zmieniono': return `${w.zmodyfikowano.slice(5, 7)}.${w.zmodyfikowano.slice(0, 4)}` // miesiąc zmiany
   }
 }
@@ -103,7 +106,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
     setLadowanie(true)
     const { data, error } = await supabase
       .from('zlecenia')
-      .select(`id, mpk, nr_zamowienia, pozycja_zamowienia, nazwa, mechanik, konto, nr_azo, status, zmodyfikowano, komentarz_handlowca,
+      .select(`id, mpk, nr_zamowienia, pozycja_zamowienia, nazwa, mechanik, konto, nr_azo, dokument, status, zmodyfikowano, komentarz_handlowca,
                pozycje_uslug(ilosc, cena, doplata_proc, cennik_pozycja_id),
                pozycje_materialowe(wartosc_zakupu, narzut_proc, dostawca),
                uslugi_obce(wartosc_zakupu, narzut_proc)`)
@@ -130,7 +133,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
   function sortuj(kolumna: Kolumna) {
     setSortowanie((s) => {
       // Pierwsze kliknięcie: tekst rosnąco (A→Z), liczby i daty malejąco (najwyższe/najnowsze na górze).
-      const nowe = s.kolumna === kolumna ? { kolumna, rosnaco: !s.rosnaco } : { kolumna, rosnaco: ['nr', 'azo', 'konto', 'nazwa', 'mpk', 'mechanik', 'status'].includes(kolumna) }
+      const nowe = s.kolumna === kolumna ? { kolumna, rosnaco: !s.rosnaco } : { kolumna, rosnaco: ['nr', 'azo', 'konto', 'nazwa', 'mpk', 'mechanik', 'status', 'dokument'].includes(kolumna) }
       try { localStorage.setItem(KLUCZ_SORTOWANIA, JSON.stringify(nowe)) } catch { /* brak pamięci przeglądarki - sortowanie działa bez zapamiętania */ }
       return nowe
     })
@@ -142,7 +145,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
     const fraza = szukaj.trim().toLowerCase()
     if (status && (status === OTWARTE ? w.status === 'zakonczony' : w.status !== status)) return false
     if (mpk && w.mpk !== mpk) return false
-    if (fraza && !`${w.nazwa} ${w.nr_zamowienia ?? ''} ${w.mechanik ?? ''} ${w.nr_azo ?? ''} ${w.konto ?? ''}`.toLowerCase().includes(fraza)) return false
+    if (fraza && !`${w.nazwa} ${w.nr_zamowienia ?? ''} ${w.mechanik ?? ''} ${w.nr_azo ?? ''} ${w.konto ?? ''} ${w.dokument ?? ''}`.toLowerCase().includes(fraza)) return false
     for (const [k, wybrane] of Object.entries(filtry) as [KolumnaFiltra, Set<string>][]) {
       if (k !== pomin && !wybrane.has(wartoscDoFiltra(w, k))) return false
     }
@@ -165,7 +168,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
   const sumaWidocznych = suma(widoczne)
   const sumaWszystkich = suma(wiersze)
   const zawezone = widoczne.length !== wiersze.length
-  const kolumnPrzedWartoscia = handlowiec ? 8 : 7
+  const kolumnPrzedWartoscia = handlowiec ? 9 : 8
   const wybrane = widoczne.filter((w) => zaznaczone.has(w.id))
   const doZakonczenia = widoczne.filter((w) => w.status === 'wyeksportowany' || w.status === 'braki_zgloszone')
   const wszystkieZaznaczone = doZakonczenia.length > 0 && doZakonczenia.every((w) => zaznaczone.has(w.id))
@@ -228,7 +231,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
       )}
 
       <div className="flex flex-wrap gap-3">
-        <input className="pole max-w-xs" placeholder="Szukaj: nazwa, nr zamówienia, nr AZO, konto, mechanik" value={szukaj} onChange={(e) => setSzukaj(e.target.value)} />
+        <input className="pole max-w-xs" placeholder="Szukaj: nazwa, nr zamówienia, nr AZO, konto, mechanik, dokument" value={szukaj} onChange={(e) => setSzukaj(e.target.value)} />
         <select className="pole w-auto" value={status} onChange={(e) => setStatus(e.target.value as StatusZlecenia | '' | typeof OTWARTE)}>
           <option value="">Wszystkie statusy</option>
           <option value={OTWARTE}>Otwarte (bez zakończonych)</option>
@@ -279,6 +282,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
               {naglowek('mpk', 'MPK')}
               {naglowek('mechanik', 'Mechanik')}
               {naglowek('status', 'Status')}
+              {naglowek('dokument', 'Dokument')}
               {naglowek('wartosc', 'Wartość [zł]', 'text-right')}
               {naglowek('zmieniono', 'Zmieniono')}
             </tr>
@@ -313,12 +317,13 @@ export function ListaZlecen({ profil, otworz }: Props) {
                     {ETYKIETY_STATUSU[w.status]}
                   </span>
                 </td>
+                <td className="komorka text-sm">{w.dokument ?? <span className="text-slate-300">-</span>}</td>
                 <td className="komorka liczba">{zl(w.wartosc)}</td>
                 <td className="komorka whitespace-nowrap text-xs text-slate-500">{dataGodzinaPL(w.zmodyfikowano)}</td>
               </tr>
             ))}
             {!ladowanie && widoczne.length === 0 && (
-              <tr><td colSpan={handlowiec ? 10 : 9} className="komorka py-8 text-center text-slate-500">Brak zleceń.</td></tr>
+              <tr><td colSpan={handlowiec ? 11 : 10} className="komorka py-8 text-center text-slate-500">Brak zleceń.</td></tr>
             )}
           </tbody>
           {!ladowanie && wiersze.length > 0 && (

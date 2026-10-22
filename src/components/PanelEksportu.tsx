@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
 
-const ZAPYTANIE = `id, mpk, nr_zamowienia, pozycja_zamowienia, nazwa, mechanik, zlozono, linia_uslugi, linia_materialy, nr_azo, konto,
+const ZAPYTANIE = `id, mpk, nr_zamowienia, pozycja_zamowienia, nazwa, mechanik, zlozono, linia_uslugi, linia_materialy, nr_azo, konto, dokument,
   uslugi_obce(id, opis, wykonawca, numer_faktury, wartosc_zakupu, narzut_proc, nr_linii_sap, kolejnosc),
   zalaczniki(typ, usluga_obca_id),
   pozycje_uslug(ilosc, cena, doplata_proc, kolejnosc, wlasny_opis, wlasna_jm, wlasny_indeks, nr_linii_sap, cennik_pozycje(*)),
@@ -174,6 +174,7 @@ export function PanelEksportu({ otworz }: { otworz: (id: string) => void }) {
                     <td className="komorka font-mono">{etykietaZamowienia(z)}</td>
                     <td className="komorka">
                       <button className="text-left hover:underline" onClick={() => otworz(z.id)}>{z.nazwa}</button>
+                      {z.dokument && <span className="ml-2 text-xs text-slate-500" title="Dokument potrzebny do rozliczenia">dokument: {z.dokument}</span>}
                       {maPozycjeSpozaCennika(z) && (
                         <span className="ml-2 rounded bg-amber-50 px-1.5 text-xs text-amber-800 ring-1 ring-amber-300"
                           title="Kierownik dodał pozycję spoza cennika - sprawdź opis, cenę i indeks SAP przed wklejeniem">

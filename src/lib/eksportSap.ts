@@ -70,6 +70,7 @@ export interface ZlecenieDoEksportu {
   linia_uslugi?: number | null
   linia_materialy?: number | null
   nr_azo?: string | null
+  dokument?: string | null
   konto?: string | null
   uslugi_obce?: {
     opis: string
@@ -254,7 +255,7 @@ export async function plikXlsx(zlecenia: ZlecenieDoEksportu[], materialy: Materi
   const linie: (string | number | null)[][] = []
   const naglowkiBlokow: number[] = []
   const naglowkiKolumn: number[] = []
-  const zestawienie: (string | number)[][] = [['Nr zamówienia', 'Nr AZO', 'Konto', 'MPK', 'Nazwa', 'Liczba linii', 'Wartość']]
+  const zestawienie: (string | number)[][] = [['Nr zamówienia', 'Nr AZO', 'Konto', 'MPK', 'Nazwa', 'Dokument', 'Liczba linii', 'Wartość']]
   const arkusze: { nazwa: string; ws: Arkusz }[] = []
   const uzyte = new Set<string>(['Linie SAP', 'Szczegóły', 'Zestawienie'])
   let razem = 0
@@ -269,7 +270,7 @@ export async function plikXlsx(zlecenia: ZlecenieDoEksportu[], materialy: Materi
     linie.push([...KOLUMNY_SAP])
     linie.push(...wiersze.map(ukladFiori))
     linie.push([])
-    zestawienie.push([etykietaZamowienia(z), z.nr_azo ?? '', z.konto ?? '', z.mpk, z.nazwa, wiersze.length, suma])
+    zestawienie.push([etykietaZamowienia(z), z.nr_azo ?? '', z.konto ?? '', z.mpk, z.nazwa, z.dokument ?? '', wiersze.length, suma])
 
     const ws = XLSX.utils.aoa_to_sheet([[...KOLUMNY_SAP], ...wiersze.map(ukladFiori)])
     ws['!cols'] = SZEROKOSCI_SAP.map((wch) => ({ wch }))
@@ -281,7 +282,7 @@ export async function plikXlsx(zlecenia: ZlecenieDoEksportu[], materialy: Materi
     uzyte.add(nazwa)
     arkusze.push({ nazwa, ws })
   }
-  zestawienie.push(['RAZEM', '', '', '', '', '', grosze(razem)])
+  zestawienie.push(['RAZEM', '', '', '', '', '', '', grosze(razem)])
 
   const wsL = XLSX.utils.aoa_to_sheet(linie)
   wsL['!cols'] = SZEROKOSCI_SAP.map((wch) => ({ wch }))
@@ -298,9 +299,9 @@ export async function plikXlsx(zlecenia: ZlecenieDoEksportu[], materialy: Materi
 
   // 3. Zestawienie
   const wsZ = XLSX.utils.aoa_to_sheet(zestawienie)
-  wsZ['!cols'] = [16, 16, 16, 6, 50, 12, 14].map((wch) => ({ wch }))
-  styluj(wsZ, 0, 7, STYL_NAGLOWKA)
-  styluj(wsZ, zestawienie.length - 1, 7, { font: { bold: true } })
+  wsZ['!cols'] = [16, 16, 16, 6, 50, 30, 12, 14].map((wch) => ({ wch }))
+  styluj(wsZ, 0, 8, STYL_NAGLOWKA)
+  styluj(wsZ, zestawienie.length - 1, 8, { font: { bold: true } })
   XLSX.utils.book_append_sheet(wb, wsZ, 'Zestawienie')
 
   // 4. Arkusz na zamówienie

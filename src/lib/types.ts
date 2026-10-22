@@ -58,6 +58,7 @@ export interface Zlecenie {
   linia_materialy: number | null
   nr_azo: string | null
   uwagi: string | null
+  dokument: string | null
   komentarz_handlowca: string | null
   utworzono: string
   zmodyfikowano: string

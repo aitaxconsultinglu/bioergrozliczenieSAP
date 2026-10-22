@@ -41,6 +41,7 @@ interface Naglowek {
   data_przyjecia: string
   data_zakonczenia: string
   uwagi: string
+  dokument: string
   linia_uslugi: string
   linia_materialy: string
 }
@@ -63,7 +64,7 @@ interface Historia {
 
 const pustyNaglowek = (mpk: string): Naglowek => ({
   mpk, nr_zamowienia: '', pozycja_zamowienia: '', konto: '', nazwa: '', mechanik: '',
-  szablon: 'urzadzenie', dane_szablonu: {}, data_przyjecia: '', data_zakonczenia: '', uwagi: '',
+  szablon: 'urzadzenie', dane_szablonu: {}, data_przyjecia: '', data_zakonczenia: '', uwagi: '', dokument: '',
   linia_uslugi: '', linia_materialy: '',
 })
 
@@ -74,7 +75,7 @@ function zBazy(z: any): Stan {
       mpk: z.mpk, nr_zamowienia: z.nr_zamowienia ?? '', pozycja_zamowienia: z.pozycja_zamowienia?.toString() ?? '',
       konto: z.konto ?? '', nazwa: z.nazwa ?? '', mechanik: z.mechanik ?? '', szablon: z.szablon,
       dane_szablonu: z.dane_szablonu ?? {}, data_przyjecia: z.data_przyjecia ?? '',
-      data_zakonczenia: z.data_zakonczenia ?? '', uwagi: z.uwagi ?? '',
+      data_zakonczenia: z.data_zakonczenia ?? '', uwagi: z.uwagi ?? '', dokument: z.dokument ?? '',
       linia_uslugi: z.linia_uslugi?.toString() ?? '', linia_materialy: z.linia_materialy?.toString() ?? '',
     },
     uslugi: [...(z.pozycje_uslug ?? [])].sort((a: any, b: any) => a.kolejnosc - b.kolejnosc || a.id - b.id).map((u: any) => ({
@@ -173,7 +174,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
       // ceną, narzutem i dokumentem zakupu - prośba działu handlowego 2026-10-22), bez numeru
       // zamówienia, dat, kart, braków i usług obcych - to zawsze nowe dane.
       const nowy: Stan = {
-        naglowek: { ...s.naglowek, nr_zamowienia: '', pozycja_zamowienia: '', linia_uslugi: '', linia_materialy: '', data_przyjecia: '', data_zakonczenia: '', uwagi: '' },
+        naglowek: { ...s.naglowek, nr_zamowienia: '', pozycja_zamowienia: '', linia_uslugi: '', linia_materialy: '', data_przyjecia: '', data_zakonczenia: '', uwagi: '', dokument: '' },
         uslugi: s.uslugi.map((u) => ({ ...u, id: undefined, cena: undefined, nr_linii_sap: null, klucz: nowyKlucz() })),
         materialy: s.materialy.map((m) => ({ ...m, id: undefined, klucz: nowyKlucz() })),
         karty: [], braki: [], uslugiObce: [],
@@ -614,6 +615,15 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
           <label className="block sm:col-span-2">
             <span className="etykieta">Uwagi</span>
             <input className="pole" disabled={!edycja} value={naglowek.uwagi} onChange={(e) => ustawNaglowek({ uwagi: e.target.value })} />
+          </label>
+          <label className="block sm:col-span-2">
+            <span className="etykieta">Dokument <span className="font-normal text-slate-500">(potrzebny do rozliczenia)</span></span>
+            <input className="pole" disabled={!edycja} value={naglowek.dokument} list="podpowiedzi-dokument"
+              placeholder="np. karta remontowa KR 37/09/2026, protokół z wyważania, protokół pomiarów"
+              onChange={(e) => ustawNaglowek({ dokument: e.target.value })} />
+            <datalist id="podpowiedzi-dokument">
+              {['karta remontowa', 'protokół z wyważania', 'protokół pomiarów', 'protokół odbioru', 'brak dokumentu'].map((d) => <option key={d} value={d} />)}
+            </datalist>
           </label>
         </div>
       </section>
