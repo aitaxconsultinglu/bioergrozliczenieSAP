@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dial
 const ZAPYTANIE = `id, mpk, nr_zamowienia, pozycja_zamowienia, nazwa, mechanik, zlozono, linia_uslugi, linia_materialy, nr_azo, konto, dokument,
   uslugi_obce(id, opis, wykonawca, numer_faktury, wartosc_zakupu, narzut_proc, nr_linii_sap, kolejnosc),
   zalaczniki(typ, usluga_obca_id),
-  pozycje_uslug(ilosc, cena, doplata_proc, kolejnosc, wlasny_opis, wlasna_jm, wlasny_indeks, nr_linii_sap, cennik_pozycje(*)),
+  pozycje_uslug(ilosc, cena, doplata_proc, kolejnosc, mpk_wykonawcy, wlasny_opis, wlasna_jm, wlasny_indeks, nr_linii_sap, cennik_pozycje(*)),
   pozycje_materialowe(nazwa, ilosc, jm, wartosc_zakupu, narzut_proc, dostawca, kolejnosc, numer_faktury)`
 
 type ZlecenieZPanelu = ZlecenieDoEksportu & { mechanik: string | null; zlozono: string | null; bezSkanu: number }

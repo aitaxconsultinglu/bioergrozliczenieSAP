@@ -47,7 +47,8 @@ export function PozycjeCennikowe({ uslugi, ustaw, szablonZlecenia, edycja }: Pro
     }).slice(0, MAKS_WYNIKOW)
   }, [doWyboru, fraza, kategoria, kategorie])
 
-  const wiersze = uslugi.filter((u) => u.cennik_pozycja_id === null || !idStawek.has(u.cennik_pozycja_id))
+  // Pozycje z MPK wykonawcy (usługi wewnętrzne innych działów) mają własną sekcję.
+  const wiersze = uslugi.filter((u) => !u.mpk_wykonawcy && (u.cennik_pozycja_id === null || !idStawek.has(u.cennik_pozycja_id)))
 
   function dodaj(id: number) {
     const istniejaca = wiersze.find((u) => u.cennik_pozycja_id === id && !u.mpk_wykonawcy)

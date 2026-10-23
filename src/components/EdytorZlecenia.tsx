@@ -3,7 +3,7 @@ import { ArrowLeft, CheckCheck, CircleAlert, ClipboardCopy, Copy, FileSpreadshee
 import { supabase } from '@/lib/supabase'
 import { useSlowniki } from '@/lib/slowniki'
 import { komunikatPL } from '@/lib/config'
-import { ETYKIETY_BRAKU, ETYKIETY_STATUSU, KOLORY_STATUSU, dataGodzinaPL, zl } from '@/lib/format'
+import { ETYKIETY_STATUSU, KOLORY_STATUSU, dataGodzinaPL, zl } from '@/lib/format'
 import { czySynthos, grosze, nowyKlucz, policzSumy, wartoscMaterialu } from '@/lib/obliczenia'
 import { SZABLONY, brakiKarty, parametrySilnika, szablon } from '@/lib/szablony'
 import { KOLUMNY_KWOT, KOLUMNY_SAP, ukladFiori, etykietaZamowienia, plikXlsx, pobierz, tekstDoSchowka, wierszeSap, type ZlecenieDoEksportu } from '@/lib/eksportSap'
@@ -13,9 +13,8 @@ import type {
 import { cn } from '@/lib/utils'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
-import { PoleLiczby } from './PoleLiczby'
-import { PoleWyboru } from './PoleWyboru'
 import { SiatkaRobocizny } from './zlecenie/SiatkaRobocizny'
+import { UslugiWewnetrzne } from './zlecenie/UslugiWewnetrzne'
 import { PozycjeCennikowe } from './zlecenie/PozycjeCennikowe'
 import { TabelaMaterialow } from './zlecenie/TabelaMaterialow'
 import { TabelaUslugObcych } from './zlecenie/TabelaUslugObcych'
@@ -111,7 +110,7 @@ const bezPustychMaterialow = (m: PozycjaMaterialowa[]) =>
   m.filter((x) => x.nazwa.trim() || x.wartosc_zakupu > 0 || x.numer_faktury)
 
 export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Props) {
-  const { cennik, kategorie, stawki, materialWgKategorii } = useSlowniki()
+  const { cennik, kategorie, materialWgKategorii } = useSlowniki()
   const handlowiec = profil.rola === 'handlowiec'
   const kopia = zlecenieId?.startsWith('kopia:') ?? false
   const idZrodla = kopia ? zlecenieId!.slice(6) : zlecenieId
@@ -461,7 +460,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
           return {
             ilosc: u.ilosc, cena: u.cena ?? c?.cena ?? u.wlasna_cena ?? 0, doplata_proc: u.doplata_proc,
             kolejnosc: i, cennik_pozycje: c, wlasny_opis: u.wlasny_opis, wlasna_jm: u.wlasna_jm, wlasny_indeks: u.wlasny_indeks,
-            nr_linii_sap: u.nr_linii_sap,
+            nr_linii_sap: u.nr_linii_sap, mpk_wykonawcy: u.mpk_wykonawcy,
           }
         }),
       pozycje_materialowe: bezPustychMaterialow(materialy).map((m, i) => ({ ...m, kolejnosc: i })),
@@ -635,7 +634,13 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
 
       <section className="sekcja">
         <h3 className="mb-3 font-semibold">Robocizna wg rbg <span className="font-normal text-slate-500">(godziny × stawka z cennika)</span></h3>
-        <SiatkaRobocizny uslugi={uslugi} ustaw={ustaw('uslugi')} mpkZlecenia={naglowek.mpk} edycja={edycja} />
+        <SiatkaRobocizny uslugi={uslugi} ustaw={ustaw('uslugi')} mpkZlecenia={naglowek.mpk} edycja={edycja}
+          braki={braki} ustawBraki={ustaw('braki')} />
+      </section>
+
+      <section className="sekcja">
+        <h3 className="mb-3 font-semibold">Usługi wewnętrzne <span className="font-normal text-slate-500">(wyważanie, osiowanie, metrologia wykonane przez inny dział, np. P07)</span></h3>
+        <UslugiWewnetrzne uslugi={uslugi} ustaw={ustaw('uslugi')} mpkZlecenia={naglowek.mpk} edycja={edycja} />
       </section>
 
       <section className="sekcja">
@@ -657,64 +662,6 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
           pdf={(k) => void pobierzPdf(k)} skany={zalaczniki.filter((z) => z.typ === 'karta_remontowa')} zlecenieId={idZapisanego}
           mozeDodacZalacznik={mozeDodacZalacznik} mozeUsunacZalacznik={mozeUsunacZalacznik} odswiezZalaczniki={odswiezZalaczniki}
           zapiszNowe={nowe ? { zapisz: zapiszWBazie, otworz: otworzInne } : undefined} silniki={silniki} />
-      </section>
-
-      <section className="sekcja">
-        <h3 className="mb-1 font-semibold">Braki godzin</h3>
-        <p className="mb-3 text-xs text-slate-500">Gdy zleceniodawca założył za mało godzin w zamówieniu - dział handlowy pilnuje ich uzupełnienia.</p>
-        {braki.length > 0 && (
-          <table className="mb-2 w-full border-collapse">
-            <thead>
-              <tr>
-                <th className="komorka-naglowek">Stanowisko</th>
-                <th className="komorka-naglowek w-24 text-right">Rbg</th>
-                <th className="komorka-naglowek">Opis</th>
-                <th className="komorka-naglowek w-48">Status</th>
-                <th className="komorka-naglowek w-10" />
-              </tr>
-            </thead>
-            <tbody>
-              {braki.map((b) => {
-                const edytowalny = edycja && b.status === 'zgloszony'
-                const zmien = (z: Partial<BrakGodzin>) => ustaw('braki')(braki.map((x) => (x === b ? { ...x, ...z } : x)))
-                return (
-                  <tr key={b.klucz}>
-                    <td className="komorka p-0">
-                      <PoleWyboru
-                        wKomorce
-                        disabled={!edytowalny}
-                        aria-label="Stanowisko"
-                        pusta="(nie dotyczy stanowiska)"
-                        placeholderInne="wpisz stanowisko"
-                        opcje={stawki.map((s) => ({ wartosc: `id:${s.cennik_pozycja_id}`, etykieta: `${s.stanowisko}${s.pora !== 'stala' ? ` (${s.pora})` : ''}` }))}
-                        wartosc={b.cennik_pozycja_id ? `id:${b.cennik_pozycja_id}` : b.stanowisko_tekst ?? ''}
-                        zmien={(w) => zmien(w.startsWith('id:')
-                          ? { cennik_pozycja_id: Number(w.slice(3)), stanowisko_tekst: null }
-                          : { cennik_pozycja_id: null, stanowisko_tekst: w || null })}
-                      />
-                    </td>
-                    <td className="komorka p-0"><PoleLiczby wartosc={b.ilosc_rbg} disabled={!edytowalny} zmien={(n) => zmien({ ilosc_rbg: n })} aria-label="Rbg braku" /></td>
-                    <td className="komorka p-0"><input className="pole-komorki" disabled={!edytowalny} value={b.opis ?? ''} onChange={(e) => zmien({ opis: e.target.value })} /></td>
-                    <td className="komorka text-sm">{ETYKIETY_BRAKU[b.status]}</td>
-                    <td className="komorka text-center">
-                      {edytowalny && (
-                        <button aria-label="Usuń brak" onClick={() => ustaw('braki')(braki.filter((x) => x !== b))} className="text-slate-400 hover:text-red-600">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
-        {edycja && (
-          <button className="text-sm text-blekit-ciemny hover:underline"
-            onClick={() => ustaw('braki')([...braki, { klucz: nowyKlucz(), cennik_pozycja_id: null, stanowisko_tekst: null, ilosc_rbg: 0, status: 'zgloszony', opis: null }])}>
-            + Zgłoś brak godzin
-          </button>
-        )}
       </section>
 
       <details className="sekcja bez-druku">

@@ -88,6 +88,8 @@ export interface ZlecenieDoEksportu {
     kolejnosc: number
     /** null = pozycja spoza cennika */
     cennik_pozycje: PozycjaCennika | null
+    /** Inny dział, który wykonał pracę (kooperacja godzinowa / usługa wewnętrzna). */
+    mpk_wykonawcy?: string | null
     wlasny_opis?: string | null
     wlasna_jm?: string | null
     wlasny_indeks?: string | null
@@ -202,7 +204,9 @@ export function wierszeSzczegolow(z: ZlecenieDoEksportu): (string | number | nul
   const wynik: (string | number | null)[][] = []
   for (const u of z.pozycje_uslug) {
     const c = u.cennik_pozycje
-    const rodzaj = !c ? 'Spoza cennika' : c.nr_pozycji === GRUPA_ROBOCIZNY ? 'Robocizna wg rbg' : 'Robocizna wg cennika'
+    const rodzaj = !c ? 'Spoza cennika'
+      : c.nr_pozycji === GRUPA_ROBOCIZNY ? (u.mpk_wykonawcy ? `Kooperacja ${u.mpk_wykonawcy} (rbg)` : 'Robocizna wg rbg')
+      : u.mpk_wykonawcy ? `Usługa wewnętrzna ${u.mpk_wykonawcy}` : 'Robocizna wg cennika'
     wynik.push([
       nr, z.nazwa, z.mpk, rodzaj, u.nr_linii_sap ?? z.linia_uslugi ?? null, c?.indeks_sap ?? u.wlasny_indeks ?? '',
       c?.opis ?? u.wlasny_opis ?? '', Number(u.ilosc), c?.jm ?? u.wlasna_jm ?? '',

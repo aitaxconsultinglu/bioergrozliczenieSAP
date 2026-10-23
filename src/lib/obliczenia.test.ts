@@ -144,3 +144,16 @@ describe('plik XLSX w układzie Fiori', () => {
     expect(wiersze[1]).toEqual([20, '5005843', 'EMALIA', 21, 21, 42, 0.5])
   })
 })
+
+describe('usługi wewnętrzne innych MPK', () => {
+  it('w Szczegółach widać MPK wykonawcy, a do SAP idzie zwykła pozycja z cennika', () => {
+    const wywazanie = { id: 9, nr_pozycji: 20, numer_linii: 60, indeks_sap: '5005060', opis: 'Wyważ.śr.wirnika do 500mm kl.wyw.G-6,3', jm: 'H', cena: 730, aktywna: true }
+    const z: ZlecenieDoEksportu = {
+      id: 'w', mpk: 'P04', nr_zamowienia: '4200000003', pozycja_zamowienia: null, nazwa: 'WIRNIK', linia_uslugi: 10,
+      pozycje_uslug: [{ ilosc: 1, cena: 730, doplata_proc: 0, kolejnosc: 0, cennik_pozycje: wywazanie, mpk_wykonawcy: 'P07' }],
+      pozycje_materialowe: [],
+    }
+    expect(wierszeSzczegolow(z)[0][3]).toBe('Usługa wewnętrzna P07')
+    expect(wierszeSap(z, new Map())[0].slice(0, 4)).toEqual([10, '5005060', 'Wyważ.śr.wirnika do 500mm kl.wyw.G-6,3', 1])
+  })
+})
