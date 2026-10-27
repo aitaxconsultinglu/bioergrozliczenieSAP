@@ -90,7 +90,7 @@ export function Instrukcja({ profil }: { profil: Profil }) {
           <Krok nr={4} tytul="Robocizna wg rbg (godziny)">
             <p>Wpisz liczbę roboczogodzin w kratce <strong>stanowisko × pora dnia</strong> (7–15, 15–19, 19–7, dni wolne). Stawka bierze się z cennika.</p>
             <p>Godziny przepracowane przez ludzi z innego MPK dodaj w części <strong>„Kooperacja z innym MPK”</strong>. Zastępuje to dopiski typu „20 RBG DLA SPORYSZ”.</p>
-            <p><strong>Brak godzin</strong>: jeśli zleceniodawca założył w zamówieniu za mało godzin, wpisz brakujące rbg w ostatniej kolumnie siatki, przy stanowisku. Dział handlowy będzie pilnował uzupełnienia.</p>
+            <p><strong>Brak godzin</strong>: jeśli zleceniodawca założył w zamówieniu za mało godzin, wpisz brakujące rbg w kolumnie „Brak godzin” przy stanowisku. Obok liczy się wartość braku (rbg × stawka), a braki są wyróżnione na czerwono. Dział handlowy będzie pilnował uzupełnienia.</p>
             <p><strong>Usługi wewnętrzne</strong> (osobna część pod robocizną): wyważanie, osiowanie lub metrologię wykonane przez inny dział wpisujesz przyciskiem „Dodaj usługę wewnętrzną”.
               Wybierasz MPK wykonawcy (domyślnie P07), usługę z cennika i ilość. Cena jest z umowy, a do SAP pozycja idzie normalnie. Dział handlowy widzi sumę na każde MPK.</p>
           </Krok>

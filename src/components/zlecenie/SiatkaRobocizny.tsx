@@ -2,8 +2,9 @@ import { useMemo } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { useSlowniki } from '@/lib/slowniki'
 import { ETYKIETY_BRAKU, ETYKIETY_PORY, zl } from '@/lib/format'
-import { nowyKlucz, wartoscUslugi } from '@/lib/obliczenia'
+import { grosze, nowyKlucz, wartoscUslugi } from '@/lib/obliczenia'
 import type { BrakGodzin, Pora, PozycjaUslugi, Stawka } from '@/lib/types'
+import { cn } from '@/lib/utils'
 import { PoleLiczby } from '../PoleLiczby'
 
 const PORY: Pora[] = ['7-15', '15-19', '19-7', 'wolne']
@@ -75,6 +76,9 @@ export function SiatkaRobocizny({ uslugi, ustaw, mpkZlecenia, edycja, braki, ust
   }
   const brakiBezStanowiska = braki.filter((b) => b.cennik_pozycja_id === null || !idStawek.has(b.cennik_pozycja_id))
   const sumaBrakow = braki.reduce((s, b) => s + b.ilosc_rbg, 0)
+  /** Wartość braku = rbg × stawka z cennika, pod którą brak jest zapisany (stała albo 7-15). */
+  const wartoscBraku = (b: BrakGodzin) => b.ilosc_rbg * (stawki.find((s) => s.cennik_pozycja_id === b.cennik_pozycja_id)?.cena ?? 0)
+  const wartoscBrakow = grosze(braki.reduce((s, b) => s + wartoscBraku(b), 0))
 
   function cenaWiersza(u: PozycjaUslugi) {
     return u.cena ?? stawki.find((s) => s.cennik_pozycja_id === u.cennik_pozycja_id)?.cena ?? 0
@@ -95,6 +99,9 @@ export function SiatkaRobocizny({ uslugi, ustaw, mpkZlecenia, edycja, braki, ust
               <th className="komorka-naglowek text-right">Wartość [zł]</th>
               <th className="komorka-naglowek w-28 text-right" title="Za mało godzin w zamówieniu Synthos - dział handlowy pilnuje uzupełnienia (zakładka „Braki godzin”)">
                 Brak godzin [rbg]
+              </th>
+              <th className="komorka-naglowek w-32 text-right" title="Brakujące rbg × stawka z cennika (dzienna 7-15 albo stała)">
+                Wartość braku [zł]
               </th>
             </tr>
           </thead>
@@ -148,12 +155,20 @@ export function SiatkaRobocizny({ uslugi, ustaw, mpkZlecenia, edycja, braki, ust
                     // Brak już uzupełniony / rozliczony przez dział handlowy - tylko do odczytu.
                     const edytowalny = edycja && lista.length <= 1 && lista.every((b) => b.status === 'zgloszony')
                     const status = lista.find((b) => b.status !== 'zgloszony')?.status
+                    const wartoscWiersza = grosze(lista.reduce((s, b) => s + wartoscBraku(b), 0))
+                    // Braki na czerwono, żeby od razu rzucały się w oczy.
                     return (
-                      <td className="komorka p-0 bg-amber-50/40" title={status ? `Brak: ${ETYKIETY_BRAKU[status].toLowerCase()}` : undefined}>
-                        <PoleLiczby aria-label={`${nazwa} - brak godzin`} wartosc={suma} disabled={!edytowalny}
-                          zmien={(n) => ustawBrak(pory, n)} placeholder="0" />
-                        {status && <span className="block px-2 pb-0.5 text-right text-[10px] text-slate-500">{ETYKIETY_BRAKU[status].toLowerCase()}</span>}
-                      </td>
+                      <>
+                        <td className={cn('komorka p-0', suma > 0 ? 'bg-red-50' : 'bg-slate-50/60')} title={status ? `Brak: ${ETYKIETY_BRAKU[status].toLowerCase()}` : undefined}>
+                          <PoleLiczby aria-label={`${nazwa} - brak godzin`} wartosc={suma} disabled={!edytowalny}
+                            zmien={(n) => ustawBrak(pory, n)} placeholder="0"
+                            className={suma > 0 ? 'font-semibold text-red-700' : undefined} />
+                          {status && <span className="block px-2 pb-0.5 text-right text-[10px] text-slate-500">{ETYKIETY_BRAKU[status].toLowerCase()}</span>}
+                        </td>
+                        <td className={cn('komorka liczba', suma > 0 && 'bg-red-50 font-semibold text-red-700')}>
+                          {wartoscWiersza ? zl(wartoscWiersza) : ''}
+                        </td>
+                      </>
                     )
                   })()}
                 </tr>
@@ -235,7 +250,9 @@ export function SiatkaRobocizny({ uslugi, ustaw, mpkZlecenia, edycja, braki, ust
       )}
       <p className="text-right text-sm text-slate-600">
         Własne: <strong>{sumaGodzin.toLocaleString('pl-PL')} rbg</strong> · Robocizna razem: <strong>{zl(sumaWartosci)} zł</strong>
-        {sumaBrakow > 0 && <> · Braki godzin: <strong>{sumaBrakow.toLocaleString('pl-PL')} rbg</strong></>}
+        {sumaBrakow > 0 && (
+          <span className="text-red-700"> · Braki godzin: <strong>{sumaBrakow.toLocaleString('pl-PL')} rbg = {zl(wartoscBrakow)} zł</strong></span>
+        )}
       </p>
     </div>
   )

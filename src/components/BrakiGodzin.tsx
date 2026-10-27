@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { komunikatPL } from '@/lib/config'
-import { ETYKIETY_BRAKU, dataPL, liczba } from '@/lib/format'
+import { ETYKIETY_BRAKU, dataPL, liczba, zl } from '@/lib/format'
+import { grosze } from '@/lib/obliczenia'
 import type { Profil, StatusBraku } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Button } from './ui/button'
@@ -17,8 +18,11 @@ interface Wiersz {
   zmieniono_status: string | null
   zlecenie_id: string
   zlecenia: { mpk: string; nazwa: string; nr_zamowienia: string | null }
-  cennik_pozycje: { opis: string } | null
+  cennik_pozycje: { opis: string; cena: number } | null
 }
+
+/** Wartość braku: rbg × stawka z cennika (dla braków bez stanowiska - 0). */
+const wartosc = (w: Wiersz) => grosze(w.ilosc_rbg * Number(w.cennik_pozycje?.cena ?? 0))
 
 const KOLORY: Record<StatusBraku, string> = {
   zgloszony: 'bg-amber-50 text-amber-800 ring-amber-300',
@@ -36,7 +40,7 @@ export function BrakiGodzin({ profil, otworz }: { profil: Profil; otworz: (id: s
   const wczytaj = useCallback(async () => {
     const { data, error } = await supabase
       .from('braki_godzin')
-      .select('id, ilosc_rbg, status, opis, stanowisko_tekst, utworzono, zmieniono_status, zlecenie_id, zlecenia(mpk, nazwa, nr_zamowienia), cennik_pozycje(opis)')
+      .select('id, ilosc_rbg, status, opis, stanowisko_tekst, utworzono, zmieniono_status, zlecenie_id, zlecenia(mpk, nazwa, nr_zamowienia), cennik_pozycje(opis, cena)')
       .order('utworzono', { ascending: false })
       .limit(2000)
     if (error) { setBlad(komunikatPL(error.message)); return }
@@ -47,10 +51,11 @@ export function BrakiGodzin({ profil, otworz }: { profil: Profil; otworz: (id: s
   useEffect(() => { void wczytaj() }, [wczytaj])
 
   const podsumowanie = useMemo(() => {
-    const wgMpk = new Map<string, Record<StatusBraku, number>>()
+    const wgMpk = new Map<string, Record<StatusBraku, number> & { wartoscOtwartych: number }>()
     for (const w of wiersze) {
-      const m = wgMpk.get(w.zlecenia.mpk) ?? { zgloszony: 0, uzupelniony: 0, rozliczony: 0 }
+      const m = wgMpk.get(w.zlecenia.mpk) ?? { zgloszony: 0, uzupelniony: 0, rozliczony: 0, wartoscOtwartych: 0 }
       m[w.status] += w.ilosc_rbg
+      if (w.status === 'zgloszony') m.wartoscOtwartych = grosze(m.wartoscOtwartych + wartosc(w))
       wgMpk.set(w.zlecenia.mpk, m)
     }
     return [...wgMpk.entries()].sort(([a], [b]) => a.localeCompare(b))
@@ -80,6 +85,7 @@ export function BrakiGodzin({ profil, otworz }: { profil: Profil; otworz: (id: s
           <div key={mpk} className="sekcja">
             <p className="text-sm font-semibold">{mpk}</p>
             <p className="mt-1 text-2xl font-semibold tabular-nums text-amber-700">{liczba(s.zgloszony)} <span className="text-sm font-normal text-slate-500">rbg otwartych</span></p>
+            {s.wartoscOtwartych > 0 && <p className="text-sm font-semibold text-red-700">{zl(s.wartoscOtwartych)} zł</p>}
             <p className="text-xs text-slate-500">uzupełnione: {liczba(s.uzupelniony)} · rozliczone: {liczba(s.rozliczony)}</p>
           </div>
         ))}
@@ -104,6 +110,7 @@ export function BrakiGodzin({ profil, otworz }: { profil: Profil; otworz: (id: s
               <th className="komorka-naglowek">Zlecenie</th>
               <th className="komorka-naglowek">Stanowisko</th>
               <th className="komorka-naglowek text-right">Rbg</th>
+              <th className="komorka-naglowek text-right">Wartość [zł]</th>
               <th className="komorka-naglowek">Opis</th>
               <th className="komorka-naglowek">Status</th>
             </tr>
@@ -119,7 +126,8 @@ export function BrakiGodzin({ profil, otworz }: { profil: Profil; otworz: (id: s
                   </button>
                 </td>
                 <td className="komorka text-sm">{w.cennik_pozycje?.opis ?? w.stanowisko_tekst ?? '-'}</td>
-                <td className="komorka liczba font-medium">{liczba(w.ilosc_rbg)}</td>
+                <td className={cn('komorka liczba font-medium', w.status === 'zgloszony' && 'text-red-700')}>{liczba(w.ilosc_rbg)}</td>
+                <td className={cn('komorka liczba', w.status === 'zgloszony' && 'text-red-700')}>{wartosc(w) ? zl(wartosc(w)) : '-'}</td>
                 <td className="komorka text-sm">{w.opis}</td>
                 <td className="komorka">
                   {handlowiec ? (
@@ -133,7 +141,7 @@ export function BrakiGodzin({ profil, otworz }: { profil: Profil; otworz: (id: s
                 </td>
               </tr>
             ))}
-            {widoczne.length === 0 && <tr><td colSpan={7} className="komorka py-6 text-center text-slate-500">Brak pozycji.</td></tr>}
+            {widoczne.length === 0 && <tr><td colSpan={8} className="komorka py-6 text-center text-slate-500">Brak pozycji.</td></tr>}
           </tbody>
         </table>
       </div>
