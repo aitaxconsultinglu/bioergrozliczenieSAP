@@ -21,6 +21,16 @@ export interface Pole {
   szerokie?: boolean
 }
 
+/**
+ * Czynność z listy zakresu remontu. `pomiar` = pole liczbowe aktywne dopiero po zaznaczeniu czynności
+ * (np. próba biegu jałowego -> pobór prądu [A]); wartość ląduje w karty_remontowe.dane[pomiar.klucz].
+ */
+export interface CzynnoscZakresu {
+  klucz: string
+  etykieta: string
+  pomiar?: { klucz: string; etykieta: string; jednostka: string }
+}
+
 export interface Szablon {
   id: string
   nazwa: string
@@ -39,7 +49,7 @@ export interface Szablon {
   /** Dodatkowe pola karty (zapisywane w karty_remontowe.dane). */
   polaKarty: Pole[]
   /** Checklista zakresu remontu (karty_remontowe.dane.zakres = lista zaznaczonych kluczy). */
-  zakresRemontu: { klucz: string; etykieta: string }[]
+  zakresRemontu: CzynnoscZakresu[]
   /** Dopłaty procentowe dostępne przy pozycjach cennikowych tego szablonu. */
   doplaty: { opis: string; proc: number }[]
 }
@@ -107,7 +117,7 @@ export const SZABLONY: Record<string, Szablon> = {
       { klucz: 'uwagi', etykieta: 'Uwagi', typ: 'dlugi', szerokie: true },
     ],
     zakresRemontu: [
-      { klucz: 'pomiary', etykieta: 'Pomiary elektryczne (izolacja, rezystancja)' },
+      { klucz: 'pomiary', etykieta: 'Pomiary elektryczne (rezystancja)', pomiar: { klucz: 'opor_ohm', etykieta: 'Opór', jednostka: 'Ω' } },
       { klucz: 'demontaz', etykieta: 'Demontaż' },
       { klucz: 'czyszczenie', etykieta: 'Czyszczenie, suszenie uzwojeń' },
       { klucz: 'lozyska', etykieta: 'Wymiana łożysk' },
@@ -116,7 +126,7 @@ export const SZABLONY: Record<string, Szablon> = {
       { klucz: 'wentylator', etykieta: 'Wentylator / osłona' },
       { klucz: 'tabliczka', etykieta: 'Tabliczka zaciskowa' },
       { klucz: 'montaz', etykieta: 'Montaż' },
-      { klucz: 'proba', etykieta: 'Próba biegu jałowego' },
+      { klucz: 'proba', etykieta: 'Próba biegu jałowego', pomiar: { klucz: 'pobor_pradu_a', etykieta: 'Pobór prądu', jednostka: 'A' } },
       { klucz: 'malowanie', etykieta: 'Malowanie' },
     ],
     doplaty: [{ opis: 'Przezwojenie', proc: 10 }],

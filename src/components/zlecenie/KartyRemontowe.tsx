@@ -198,13 +198,34 @@ function Karta({ karta, nr, edycja, zmien, usun, pdf, silniki }: {
         <p className="etykieta">Zakres remontu</p>
         {s.zakresRemontu.length > 0 && (
           <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-4">
-            {s.zakresRemontu.map((z) => (
-              <label key={z.klucz} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" disabled={!edycja} checked={zakres.includes(z.klucz)}
-                  onChange={(e) => ustawDane('zakres', e.target.checked ? [...zakres, z.klucz] : zakres.filter((x) => x !== z.klucz))} />
-                {z.etykieta}
-              </label>
-            ))}
+            {s.zakresRemontu.map((z) => {
+              const zaznaczone = zakres.includes(z.klucz)
+              return (
+                <div key={z.klucz} className="text-sm">
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" disabled={!edycja} checked={zaznaczone}
+                      onChange={(e) => {
+                        const nowyZakres = e.target.checked ? [...zakres, z.klucz] : zakres.filter((x) => x !== z.klucz)
+                        // Odznaczenie czynności czyści jej pomiar, żeby na karcie nie został wynik czynności, której nie było.
+                        const dane: Record<string, unknown> = { ...karta.dane, zakres: nowyZakres }
+                        if (!e.target.checked && z.pomiar) delete dane[z.pomiar.klucz]
+                        zmien({ dane })
+                      }} />
+                    {z.etykieta}
+                  </label>
+                  {z.pomiar && (
+                    <label className={cn('ml-6 mt-0.5 flex items-center gap-1 text-xs', zaznaczone ? 'text-slate-700' : 'text-slate-400')}>
+                      {z.pomiar.etykieta}:
+                      <input className="pole w-24 py-0.5 text-right text-sm" inputMode="decimal" disabled={!edycja || !zaznaczone}
+                        aria-label={`${z.pomiar.etykieta} [${z.pomiar.jednostka}]`} placeholder={zaznaczone ? '0' : ''}
+                        value={String(karta.dane[z.pomiar.klucz] ?? '')}
+                        onChange={(e) => ustawDane(z.pomiar!.klucz, e.target.value.replace(/[^\d.,]/g, ''))} />
+                      {z.pomiar.jednostka}
+                    </label>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
         {/* Lista czynności jest otwarta - wszystko, czego nie ma na liście, wpisuje się tutaj. */}

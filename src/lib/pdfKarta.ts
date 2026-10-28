@@ -137,7 +137,9 @@ export async function pdfKart(karty: KartaRemontowa[], kontekst: KontekstKarty, 
     s.zakresRemontu.forEach((z, i) => {
       const x = MARGINES + 2 + (i % kolumny) * szer
       const yy = y + 3 + Math.floor(i / kolumny) * 4.4
-      doc.text(`${zakres.includes(z.klucz) ? '☒' : '☐'}  ${z.etykieta}`, x, yy)
+      const pomiar = z.pomiar && zakres.includes(z.klucz) && String(k.dane[z.pomiar.klucz] ?? '').trim()
+      const opis = pomiar ? `${z.etykieta} - ${z.pomiar!.etykieta.toLowerCase()}: ${pomiar} ${z.pomiar!.jednostka}` : z.etykieta
+      doc.text(`${zakres.includes(z.klucz) ? '☒' : '☐'}  ${opis}`, x, yy)
     })
     y += 3 + Math.ceil(s.zakresRemontu.length / kolumny) * 4.4
     const inne = String(k.dane.zakres_inne ?? '').trim()

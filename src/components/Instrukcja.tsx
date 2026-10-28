@@ -109,7 +109,7 @@ export function Instrukcja({ profil }: { profil: Profil }) {
           <Krok nr={6} tytul="Karty remontowe">
             <p>Pompy, przekładnie i silniki z umowy wymagają karty remontowej, <strong>jednej na każdą sztukę</strong>. Aplikacja pokazuje, ile kart brakuje.
               Przycisk <strong>„Dodaj brakujące karty”</strong> tworzy je z podpowiedzianym numerem KR.</p>
-            <p>Pola z czerwoną gwiazdką są obowiązkowe. Zakres remontu zaznaczasz na liście, a czynności spoza listy wpisujesz w polu „Inne czynności”.</p>
+            <p>Pola z czerwoną gwiazdką są obowiązkowe. Zakres remontu zaznaczasz na liście, a czynności spoza listy wpisujesz w polu „Inne czynności”. Na karcie silnika zaznaczenie „Próba biegu jałowego” odblokowuje pole <strong>pobór prądu [A]</strong>, a „Pomiary elektryczne (rezystancja)” - pole <strong>opór [Ω]</strong>; wartości trafiają też do PDF karty.</p>
             <p>Najprościej: papierową kartę z produkcji (własny wzór Bioerg) <strong>wgraj jako skan (PDF lub zdjęcie)</strong> w części „Skan karty remontowej” - liczy się jak wypełniona karta
               i nie trzeba nic przepisywać. Jeśli w jednym pliku jest kilka kart, ustaw ich liczbę. Skan można wgrać od razu przy nowym zleceniu (zapisze się samo jako robocze)
               albo <strong>dołożyć później, także po złożeniu</strong> zlecenia. Swój skan kierownik może usunąć do czasu eksportu do SAP.</p>
