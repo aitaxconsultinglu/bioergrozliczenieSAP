@@ -10,6 +10,10 @@ import { cn } from '@/lib/utils'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
 import { FiltrKolumny, PUSTE } from './FiltrKolumny'
+import type { WyborOkresu } from './NawigatorOkresow'
+import { NawigatorOkresow, WSZYSTKO, opisOkresu, pasujeDoOkresu } from './NawigatorOkresow'
+import type { OkresZAzo } from '@/lib/okresAzo'
+import { okresZAzo, zbudujDrzewoOkresow } from '@/lib/okresAzo'
 
 interface Wiersz {
   id: string
@@ -28,12 +32,15 @@ interface Wiersz {
   pozycje_materialowe: { wartosc_zakupu: number; narzut_proc: number; dostawca: Dostawca }[]
   uslugi_obce: { wartosc_zakupu: number; narzut_proc: number }[]
   wartosc: number
+  /** Okres rozliczenia odczytany z numeru AZO; null, gdy numer go nie zawiera. */
+  okres: OkresZAzo | null
 }
 
 type Kolumna = 'nr' | 'azo' | 'konto' | 'nazwa' | 'mpk' | 'mechanik' | 'status' | 'dokument' | 'wartosc' | 'zmieniono'
 interface Sortowanie { kolumna: Kolumna; rosnaco: boolean }
 
 const KLUCZ_SORTOWANIA = 'rozliczenia.lista.sortowanie'
+const KLUCZ_OKRESU = 'rozliczenia.lista.okres'
 const DOMYSLNE: Sortowanie = { kolumna: 'zmieniono', rosnaco: false }
 /** Filtr „otwarte” = wszystko oprócz zakończonych - to, czym trzeba się jeszcze zająć. */
 const OTWARTE = '__otwarte'
@@ -44,6 +51,20 @@ function wczytajSortowanie(): Sortowanie {
     return s && typeof s.kolumna === 'string' ? s : DOMYSLNE
   } catch {
     return DOMYSLNE
+  }
+}
+
+/** Zapamiętany wybór okresu. Przy nieznanym zapisie wracamy do „wszystkie” - lepiej
+ *  pokazać za dużo niż ukryć zlecenia przez stary wpis w pamięci przeglądarki. */
+function wczytajOkres(): WyborOkresu {
+  try {
+    const w = JSON.parse(localStorage.getItem(KLUCZ_OKRESU) ?? '') as WyborOkresu
+    if (w?.rodzaj === 'wszystko' || w?.rodzaj === 'bezOkresu') return w
+    if (w?.rodzaj === 'rok' && typeof w.rok === 'number') return w
+    if (w?.rodzaj === 'miesiac' && typeof w.rok === 'number' && typeof w.miesiac === 'number') return w
+    return WSZYSTKO
+  } catch {
+    return WSZYSTKO
   }
 }
 
@@ -97,6 +118,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
   const [szukaj, setSzukaj] = useState('')
   const [sortowanie, setSortowanie] = useState<Sortowanie>(wczytajSortowanie)
   const [filtry, setFiltry] = useState<Partial<Record<KolumnaFiltra, Set<string>>>>({})
+  const [okres, setOkres] = useState<WyborOkresu>(wczytajOkres)
   const [zaznaczone, setZaznaczone] = useState<Set<string>>(new Set())
   const [potwierdzZakonczenie, setPotwierdzZakonczenie] = useState(false)
   const [zajety, setZajety] = useState(false)
@@ -119,6 +141,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
     // Wartość liczymy raz przy wczytaniu - potrzebna do wyświetlenia i do sortowania.
     setWiersze(((data ?? []) as unknown as Omit<Wiersz, 'wartosc'>[]).map((w) => ({
       ...w,
+      okres: okresZAzo(w.nr_azo),
       wartosc: policzSumy(
         w.pozycje_uslug.map((u) => ({ ...u, cena: Number(u.cena), ilosc: Number(u.ilosc), doplata_proc: Number(u.doplata_proc) })),
         w.pozycje_materialowe.map((m) => ({ ...m, wartosc_zakupu: Number(m.wartosc_zakupu), narzut_proc: Number(m.narzut_proc) })),
@@ -141,8 +164,9 @@ export function ListaZlecen({ profil, otworz }: Props) {
 
   // Filtry z paska (szukaj / status / MPK) + filtry kolumn; `pomin` pozwala policzyć wartości
   // do listy w filtrze danej kolumny z uwzględnieniem pozostałych filtrów (jak w Excelu).
-  const pasuje = useCallback((w: Wiersz, pomin?: KolumnaFiltra) => {
+  const pasuje = useCallback((w: Wiersz, pomin?: KolumnaFiltra, pominOkres = false) => {
     const fraza = szukaj.trim().toLowerCase()
+    if (!pominOkres && !pasujeDoOkresu(okres, w.okres)) return false
     if (status && (status === OTWARTE ? w.status === 'zakonczony' : w.status !== status)) return false
     if (mpk && w.mpk !== mpk) return false
     if (fraza && !`${w.nazwa} ${w.nr_zamowienia ?? ''} ${w.mechanik ?? ''} ${w.nr_azo ?? ''} ${w.konto ?? ''} ${w.dokument ?? ''}`.toLowerCase().includes(fraza)) return false
@@ -150,7 +174,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
       if (k !== pomin && !wybrane.has(wartoscDoFiltra(w, k))) return false
     }
     return true
-  }, [szukaj, status, mpk, filtry])
+  }, [szukaj, status, mpk, filtry, okres])
 
   const widoczne = useMemo(() => {
     const kier = sortowanie.rosnaco ? 1 : -1
@@ -158,6 +182,22 @@ export function ListaZlecen({ profil, otworz }: Props) {
     return wiersze.filter((w) => pasuje(w))
       .sort((a, b) => kier * porownaj(a, b, sortowanie.kolumna) || b.zmodyfikowano.localeCompare(a.zmodyfikowano))
   }, [wiersze, pasuje, sortowanie])
+
+  function zmienOkres(w: WyborOkresu) {
+    setOkres(w)
+    setZaznaczone(new Set())
+    try { localStorage.setItem(KLUCZ_OKRESU, JSON.stringify(w)) } catch { /* brak pamięci przeglądarki - filtr działa bez zapamiętania */ }
+  }
+
+  /** Drzewo lat i miesięcy liczone z zleceń przechodzących POZOSTAŁE filtry (status, MPK,
+   *  szukaj, filtry kolumn), ale bez filtra okresu - tak jak w Excelu: liczba przy
+   *  miesiącu mówi, ile zleceń tam zobaczysz przy obecnych ustawieniach. Kierownik widzi
+   *  tu wyłącznie swoje MPK, bo RLS nie przysyła mu innych - nie trzeba tego filtrować
+   *  drugi raz w przeglądarce. */
+  const drzewo = useMemo(
+    () => zbudujDrzewoOkresow(wiersze.filter((w) => pasuje(w, undefined, true))),
+    [wiersze, pasuje],
+  )
 
   const ileFiltrow = Object.keys(filtry).length
   const ustawFiltr = (k: KolumnaFiltra, w: Set<string> | null) =>
@@ -212,7 +252,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
         <div>
           <h2 className="text-lg font-semibold">{handlowiec ? 'Wszystkie zlecenia' : 'Moje zlecenia'}</h2>
           <p className="text-sm text-slate-500">
-            {handlowiec ? 'Zlecenia ze wszystkich MPK.' : `MPK: ${profil.mpk.join(', ')}`} Kliknij nagłówek kolumny, aby sortować; ikonka lejka obok filtruje po wartościach.
+            {handlowiec ? 'Zlecenia ze wszystkich MPK.' : `MPK: ${profil.mpk.join(', ')}`} Zakładki okresu dzielą zlecenia po miesiącu z numeru AZO. Kliknij nagłówek kolumny, aby sortować; ikonka lejka obok filtruje po wartościach.
           </p>
         </div>
         <div className="ml-auto flex gap-2">
@@ -245,6 +285,8 @@ export function ListaZlecen({ profil, otworz }: Props) {
           </select>
         )}
       </div>
+
+      <NawigatorOkresow drzewo={drzewo} wybor={okres} zmien={zmienOkres} ileWidocznych={widoczne.length} />
 
       {ileFiltrow > 0 && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -323,7 +365,12 @@ export function ListaZlecen({ profil, otworz }: Props) {
               </tr>
             ))}
             {!ladowanie && widoczne.length === 0 && (
-              <tr><td colSpan={handlowiec ? 11 : 10} className="komorka py-8 text-center text-slate-500">Brak zleceń.</td></tr>
+              <tr><td colSpan={handlowiec ? 11 : 10} className="komorka py-8 text-center text-slate-500">
+                Brak zleceń{okres.rodzaj !== 'wszystko' && <> w wybranym okresie ({opisOkresu(okres)})</>}.
+                {okres.rodzaj !== 'wszystko' && wiersze.length > 0 && (
+                  <> <button className="text-blekit-ciemny underline" onClick={() => zmienOkres(WSZYSTKO)}>Pokaż wszystkie okresy</button></>
+                )}
+              </td></tr>
             )}
           </tbody>
           {!ladowanie && wiersze.length > 0 && (
