@@ -160,6 +160,8 @@ export function Instrukcja({ profil }: { profil: Profil }) {
             <Krok nr="3b" tytul="Filtry i kosz">
               <p>Na liście zleceń przy każdym nagłówku jest ikonka lejka: wybierasz wartości z kolumny (np. konto, MPK, status, miesiąc zmiany), jak w Excelu.
                 Pod tabelą jest <strong>suma wartości</strong>: po zawężeniu filtrami (wyszukiwarka, status, MPK, lejki) pokazuje sumę widocznych zleceń, a pod nią sumę wszystkich.
+                <strong>„Anuluj zlecenie”</strong> oznacza zlecenie jako odwołane: zostaje w historii, jest zablokowane i nie liczy się do sum (cofniesz to przez „Zmień status”).
+                Dział handlowy może też <strong>usunąć całe zlecenie w każdym statusie</strong> (przycisk „Usuń” u góry zlecenia).
                 Usunięte zlecenia trafiają do zakładki <strong>„Kosz”</strong> - przycisk „Przywróć” odtwarza je razem z pozycjami, materiałami, kartami i załącznikami.</p>
             </Krok>
             <Krok nr={4} tytul="Poprawki">
@@ -168,7 +170,7 @@ export function Instrukcja({ profil }: { profil: Profil }) {
               <p><strong>„Zakończony”</strong> - ostatni status, gdy zlecenie jest już rozliczone. Ustawisz go przyciskiem „Zakończ” w wyeksportowanym zleceniu (także z brakami zgłoszonymi do SAP)
                 albo zbiorczo na liście zleceń (zaznacz wyeksportowane → „Oznacz jako zakończone”). Na liście możesz sortować po każdej kolumnie (klik w nagłówek), także po statusie,
                 a filtr „Otwarte” ukrywa zakończone.</p>
-              <p><strong>„Zmień status”</strong> (w zleceniu, na dole) pozwala ręcznie ustawić dowolny status: roboczy, złożony, zwrócony, wyeksportowany, braki zgłoszone do SAP, zakończony - np. gdy coś oznaczono przez pomyłkę.
+              <p><strong>„Zmień status”</strong> (w zleceniu, na dole) pozwala ręcznie ustawić dowolny status: roboczy, złożony, zwrócony, wyeksportowany, braki zgłoszone do SAP, zakończony, anulowany - np. gdy coś oznaczono przez pomyłkę.
                 Powód jest opcjonalny; zmiana (i powód, jeśli go wpiszesz) zapisuje się w „Historii zmian” zlecenia. Status braku godzin (zgłoszony / uzupełniony / rozliczony) zmienisz w każdą stronę w zakładce „Braki godzin”.</p>
               <p>Drobny błąd możesz poprawić sama w zleceniu i kliknąć „Zapisz”. Jeśli poprawić musi kierownik, kliknij <strong>„Zwróć do poprawki”</strong> i napisz, co nie gra.</p>
             </Krok>

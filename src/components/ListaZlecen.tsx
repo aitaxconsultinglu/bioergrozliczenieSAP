@@ -167,7 +167,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
   const pasuje = useCallback((w: Wiersz, pomin?: KolumnaFiltra, pominOkres = false) => {
     const fraza = szukaj.trim().toLowerCase()
     if (!pominOkres && !pasujeDoOkresu(okres, w.okres)) return false
-    if (status && (status === OTWARTE ? w.status === 'zakonczony' : w.status !== status)) return false
+    if (status && (status === OTWARTE ? w.status === 'zakonczony' || w.status === 'anulowany' : w.status !== status)) return false
     if (mpk && w.mpk !== mpk) return false
     if (fraza && !`${w.nazwa} ${w.nr_zamowienia ?? ''} ${w.mechanik ?? ''} ${w.nr_azo ?? ''} ${w.konto ?? ''} ${w.dokument ?? ''}`.toLowerCase().includes(fraza)) return false
     for (const [k, wybrane] of Object.entries(filtry) as [KolumnaFiltra, Set<string>][]) {
@@ -204,7 +204,9 @@ export function ListaZlecen({ profil, otworz }: Props) {
     setFiltry((f) => { const n = { ...f }; if (w === null) delete n[k]; else n[k] = w; return n })
 
   const doPoprawki = wiersze.filter((w) => w.status === 'zwrocony').length
-  const suma = (lista: Wiersz[]) => grosze(lista.reduce((s, w) => s + w.wartosc, 0))
+  // Anulowane zlecenia nie są rozliczane - nie wchodzą do sum.
+  const suma = (lista: Wiersz[]) => grosze(lista.filter((w) => w.status !== 'anulowany').reduce((s, w) => s + w.wartosc, 0))
+  const anulowanych = widoczne.filter((w) => w.status === 'anulowany').length
   const sumaWidocznych = suma(widoczne)
   const sumaWszystkich = suma(wiersze)
   const zawezone = widoczne.length !== wiersze.length
@@ -274,7 +276,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
         <input className="pole max-w-xs" placeholder="Szukaj: nazwa, nr zamówienia, nr AZO, konto, mechanik, dokument" value={szukaj} onChange={(e) => setSzukaj(e.target.value)} />
         <select className="pole w-auto" value={status} onChange={(e) => setStatus(e.target.value as StatusZlecenia | '' | typeof OTWARTE)}>
           <option value="">Wszystkie statusy</option>
-          <option value={OTWARTE}>Otwarte (bez zakończonych)</option>
+          <option value={OTWARTE}>Otwarte (bez zakończonych i anulowanych)</option>
           {(Object.keys(ETYKIETY_STATUSU) as StatusZlecenia[]).sort((a, b) => KOLEJNOSC_STATUSU[a] - KOLEJNOSC_STATUSU[b])
             .map((k) => <option key={k} value={k}>{ETYKIETY_STATUSU[k]}</option>)}
         </select>
@@ -378,6 +380,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
               <tr className="bg-slate-50 font-semibold">
                 <td colSpan={kolumnPrzedWartoscia} className="komorka text-right">
                   {zawezone ? `Suma po filtrach (${widoczne.length} z ${wiersze.length} zleceń)` : `Suma wszystkich zleceń (${wiersze.length})`}
+                  {anulowanych > 0 && <span className="font-normal text-slate-500"> · bez {anulowanych} anulowanych</span>}
                 </td>
                 <td className="komorka liczba whitespace-nowrap">{zl(sumaWidocznych)}</td>
                 <td className="komorka" />

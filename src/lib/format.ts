@@ -42,9 +42,10 @@ export const ETYKIETY_STATUSU: Record<StatusZlecenia, string> = {
   wyeksportowany: 'Wyeksportowany do SAP',
   braki_zgloszone: 'Braki zgłoszone do SAP',
   zakonczony: 'Zakończony',
+  anulowany: 'Anulowany',
 }
 
-/** Błękit = czeka na dział handlowy, bursztyn = wymaga reakcji kierownika, limonka = w SAP, pomarańcz = braki w SAP, grafit = zakończone. */
+/** Błękit = czeka na dział handlowy, bursztyn = wymaga reakcji kierownika, limonka = w SAP, pomarańcz = braki w SAP, grafit = zakończone, czerwień = anulowane. */
 export const KOLORY_STATUSU: Record<StatusZlecenia, string> = {
   roboczy: 'bg-slate-100 text-slate-700 ring-slate-300',
   zlozony: 'bg-blekit-jasny text-blekit-ciemny ring-blekit',
@@ -52,6 +53,7 @@ export const KOLORY_STATUSU: Record<StatusZlecenia, string> = {
   wyeksportowany: 'bg-limonka-jasna text-limonka-ciemna ring-limonka',
   braki_zgloszone: 'bg-orange-50 text-orange-800 ring-orange-400',
   zakonczony: 'bg-slate-700 text-white ring-slate-700',
+  anulowany: 'bg-red-50 text-red-700 ring-red-300 line-through',
 }
 
 /** Kolejność przy sortowaniu po statusie: od tego, co wymaga pracy, do zamkniętych. */
@@ -62,6 +64,7 @@ export const KOLEJNOSC_STATUSU: Record<StatusZlecenia, number> = {
   wyeksportowany: 4,
   braki_zgloszone: 5,
   zakonczony: 6,
+  anulowany: 7,
 }
 
 export const ETYKIETY_BRAKU: Record<StatusBraku, string> = {

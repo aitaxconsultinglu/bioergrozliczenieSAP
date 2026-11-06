@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, CheckCheck, CircleAlert, ClipboardCopy, Copy, FileSpreadsheet, Printer, RotateCcw, Save, Send, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, Ban, CheckCheck, CircleAlert, ClipboardCopy, Copy, FileSpreadsheet, Printer, RotateCcw, Save, Send, Trash2, Undo2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useSlowniki } from '@/lib/slowniki'
 import { komunikatPL } from '@/lib/config'
@@ -119,7 +119,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
 
   const [stan, setStan] = useState<Stan>({ naglowek: pustyNaglowek(mpkDomyslne), uslugi: [], materialy: [], karty: [], braki: [], uslugiObce: [] })
   const [zapisany, setZapisany] = useState<string>('')
-  const [meta, setMeta] = useState<Pick<Zlecenie, 'status' | 'komentarz_handlowca' | 'zmodyfikowano' | 'zlozono' | 'wyeksportowano' | 'zakonczono'> | null>(null)
+  const [meta, setMeta] = useState<Pick<Zlecenie, 'status' | 'komentarz_handlowca' | 'zmodyfikowano' | 'zlozono' | 'wyeksportowano' | 'zakonczono' | 'anulowano'> | null>(null)
   const [historia, setHistoria] = useState<Historia>({ zamowienia: [], konta: [], mechanicy: [], numeryKart: [] })
   const [ladowanie, setLadowanie] = useState(!!idZrodla)
   const [zajety, setZajety] = useState(false)
@@ -132,7 +132,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
   const [potwierdzWycofanie, setPotwierdzWycofanie] = useState(false)
 
   const status: StatusZlecenia = meta?.status ?? 'roboczy'
-  const zamkniete = status === 'wyeksportowany' || status === 'braki_zgloszone' || status === 'zakonczony'
+  const zamkniete = status === 'wyeksportowany' || status === 'braki_zgloszone' || status === 'zakonczony' || status === 'anulowany'
   const edycja = nowe || (handlowiec ? !zamkniete : status === 'roboczy' || status === 'zwrocony')
   const { naglowek, uslugi, materialy, karty, braki, uslugiObce } = stan
   const [zalaczniki, setZalaczniki] = useState<Zalacznik[]>([])
@@ -188,7 +188,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
     setNrAzoZapisany(data.nr_azo ?? '')
     setMeta({
       status: data.status, komentarz_handlowca: data.komentarz_handlowca, zmodyfikowano: data.zmodyfikowano,
-      zlozono: data.zlozono, wyeksportowano: data.wyeksportowano, zakonczono: data.zakonczono,
+      zlozono: data.zlozono, wyeksportowano: data.wyeksportowano, zakonczono: data.zakonczono, anulowano: data.anulowano,
     })
   }, [kopia])
 
@@ -505,7 +505,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
           {!nowe && <Button onClick={() => otworzInne(`kopia:${idZrodla}`)} title="Nowe zlecenie z tym samym nagłówkiem, pozycjami i materiałami"><Copy className="h-4 w-4" /> Kopiuj jako nowe</Button>}
           <Button onClick={() => void pobierzXlsx()} title="Linie SAP + szczegóły rozliczenia (cennik, roboczogodziny, materiał)"><FileSpreadsheet className="h-4 w-4" /> XLSX</Button>
           {!nowe && <Button onClick={() => window.print()}><Printer className="h-4 w-4" /> Drukuj</Button>}
-          {!nowe && ((handlowiec && !zamkniete) || (!handlowiec && status === 'roboczy')) && (
+          {!nowe && (handlowiec || status === 'roboczy') && (
             <Button onClick={() => setPotwierdzUsun(true)}><Trash2 className="h-4 w-4" /> Usuń</Button>
           )}
         </div>
@@ -518,7 +518,9 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
       )}
       {!edycja && (
         <div className="bez-druku rounded-md bg-slate-100 px-4 py-2 text-sm text-slate-700">
-          {status === 'zakonczony'
+          {status === 'anulowany'
+            ? `Zlecenie anulowane ${dataGodzinaPL(meta?.anulowano)} - nie jest rozliczane. Cofniesz to przez „Zmień status”.`
+            : status === 'zakonczony'
             ? `Zlecenie zakończone ${dataGodzinaPL(meta?.zakonczono)} - tylko do odczytu.`
             : status === 'wyeksportowany'
             ? `Zlecenie wyeksportowane do SAP ${dataGodzinaPL(meta?.wyeksportowano)} - tylko do odczytu.`
@@ -751,6 +753,12 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
                 <CheckCheck className="h-4 w-4" /> Zakończ
               </Button>
             )}
+            {handlowiec && !nowe && status !== 'anulowany' && (
+              <Button disabled={zajety || zmieniony} title={zmieniony ? 'Najpierw zapisz zmiany' : 'Zlecenie odwołane - zostaje w historii, ale nie jest rozliczane'}
+                onClick={() => setZmianaStatusu({ otwarta: true, status: 'anulowany', powod: '' })}>
+                <Ban className="h-4 w-4" /> Anuluj zlecenie
+              </Button>
+            )}
             {handlowiec && !nowe && (
               <Button disabled={zajety || zmieniony} title={zmieniony ? 'Najpierw zapisz zmiany' : 'Ręczna zmiana statusu, np. po pomyłce'}
                 onClick={() => setZmianaStatusu({ otwarta: true, status: '', powod: '' })}>
@@ -845,7 +853,11 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
       <Dialog open={potwierdzUsun} onOpenChange={setPotwierdzUsun}>
         <DialogContent>
           <DialogTitle>Usunąć zlecenie?</DialogTitle>
-          <DialogDescription>„{naglowek.nazwa}” zostanie usunięte razem z pozycjami, materiałami i kartami. Dział handlowy może je przywrócić z zakładki „Kosz”.</DialogDescription>
+          <DialogDescription>
+            „{naglowek.nazwa}” zostanie usunięte w całości - razem z pozycjami, materiałami, kartami, brakami i załącznikami
+            {zamkniete && status !== 'anulowany' ? ' (uwaga: zlecenie było już wyeksportowane do SAP)' : ''}. Dział handlowy może je przywrócić z zakładki „Kosz”.
+            {status !== 'anulowany' && handlowiec && ' Jeśli zlecenie ma zostać w historii, użyj raczej „Anuluj zlecenie”.'}
+          </DialogDescription>
           <div className="mt-4 flex justify-end gap-2">
             <Button onClick={() => setPotwierdzUsun(false)}>Anuluj</Button>
             <Button wariant="ostrzezenie" disabled={zajety} onClick={() => void usun()}>Usuń</Button>
