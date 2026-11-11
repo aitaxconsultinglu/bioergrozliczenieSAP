@@ -22,7 +22,7 @@ Firma chce zbudować własną aplikację (analogicznie do wcześniej zbudowanych
 ## 2. Twarde ograniczenia (potwierdzone przez Bioerg, nie negocjowalne)
 
 - **Brak cyklicznego eksportu z SAP/FIORI.** Nie da się automatycznie pobrać listy zamówień ani numerów zamówień — kierownik nadal musi znać/wyszukać numer zamówienia ręcznie (aplikacja może go tylko *przechować i podpowiadać z historii*, nie *pobrać* z SAP).
-- **Układ kolumn importu do SAP jest sztywny**, ale nie da się pobrać jego pustego szablonu z SAP — trzeba go odtworzyć ręcznie (patrz sekcja 4, mamy zrzut ekranu nagłówków). Import Excela do SAP jest możliwy dopiero, gdy arkusz rozliczeniowy jest już wypełniony (czyli: eksportujemy plik w tym układzie, Justyna go importuje/wkleja do SAP — to jest do zautomatyzowania).
+- **Układ kolumn importu do SAP jest sztywny**, ale nie da się pobrać jego pustego szablonu z SAP — trzeba go odtworzyć ręcznie (patrz sekcja 4, mamy zrzut ekranu nagłówków). Import Excela do SAP jest możliwy dopiero, gdy arkusz rozliczeniowy jest już wypełniony (czyli: eksportujemy plik w tym układzie, dział handlowy importuje/wkleja go do SAP — to jest do zautomatyzowania).
 - **Registo (wewnętrzny system rejestru czasu pracy Bioerg) NIE MOŻE być w żaden sposób powiązany z tym procesem.** To wyraźna instrukcja klienta/firmy — nie budować żadnej integracji ani odniesień do Registo.
 - Numeracja linii zamówienia w SAP (10/20/30...) jest nadawana przez Synthos i **nie jest stała** — nie da się założyć "pozycja 20 = zawsze materiał" jako reguły twardej (to tylko heurystyka ok. 90% przypadków).
 
@@ -80,7 +80,7 @@ Aplikacja powinna generować eksport (CSV/XLSX) w dokładnie tym układzie kolum
 
 ### 3.6 Raporty z Optimy (AZO) — osobny, już częściowo rozpracowany temat
 
-Justyna generuje z Optimy raporty w starym formacie Crystal Reports (`.XLS`, BIFF, nie XLSX) ze scalonymi komórkami i pustymi wierszami rozdzielającymi bloki — dziś nienadające się do dalszej automatycznej obróbki. Przykłady takich raportów zostały już przeanalizowane (struktura jest przewidywalna: bloki rozdzielone pustymi wierszami, nagłówki typu "MPK: P06 Błaszczyk", wiersze "Suma:"). **To osobne zadanie** (konwerter/czyszczenie raportu) — może być drugim, mniejszym modułem tej samej aplikacji albo osobnym narzędziem, w stylu podobnym do wcześniej zbudowanego `Bioerg-karty-dostawy`.
+Dział handlowy generuje z Optimy raporty w starym formacie Crystal Reports (`.XLS`, BIFF, nie XLSX) ze scalonymi komórkami i pustymi wierszami rozdzielającymi bloki — dziś nienadające się do dalszej automatycznej obróbki. Przykłady takich raportów zostały już przeanalizowane (struktura jest przewidywalna: bloki rozdzielone pustymi wierszami, nagłówki typu "MPK: <kod> <nazwisko kierownika>", wiersze "Suma:"). **To osobne zadanie** (konwerter/czyszczenie raportu) — może być drugim, mniejszym modułem tej samej aplikacji albo osobnym narzędziem, w stylu podobnym do wcześniej zbudowanego `Bioerg-karty-dostawy`.
 
 ---
 

@@ -14,7 +14,7 @@ Zakres pierwszej iteracji (MVP):
 
 5. Panel dla Justyny (rola z szerszym dostępem): widok wszystkich zleceń, dashboard braków godzinowych, oraz eksport zaznaczonych zleceń do pliku w dokładnym układzie kolumn wymaganym przez SAP: `Numer linii | Numer usługi | Krótki tekst | Ilość | Pozostało | Podst. t.JM | Cena | Wartość | Cena Mat. | Ilość Mat. | Nr Mat. dostawcy` (BRIEF sekcja 3.5).
 
-6. Prosta autentykacja przez Supabase Auth — rola "kierownik" (przypisana do konkretnego MPK, widzi tylko swoje zlecenia) i rola "handlowiec" (Justyna, widzi wszystko + eksport).
+6. Prosta autentykacja przez Supabase Auth — rola "kierownik" (przypisana do konkretnego MPK, widzi tylko swoje zlecenia) i rola "handlowiec" (widzi wszystko + eksport).
 
 Nie buduj żadnej integracji ani odniesienia do systemu Registo — to wyraźnie wykluczone przez klienta (BRIEF sekcja 2).
 

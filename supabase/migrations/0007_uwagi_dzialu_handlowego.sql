@@ -1,5 +1,5 @@
 -- =============================================================================
--- 0007: uwagi dzialu handlowego (Justyna, 2026-10-13)
+-- 0007: uwagi dzialu handlowego (2026-10-13)
 --  - narzut na material: domyslnie 12% (ustawienie zmieniane w aplikacji), nie 15%
 --  - karta remontowa NIE na sztywno: flaga na kazdej pozycji (domyslnie z kategorii),
 --    kierownik/handlowiec moze ja odznaczyc
