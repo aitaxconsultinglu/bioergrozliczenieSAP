@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { cenaJednMaterialu, cenaUslugi, czySynthos, grosze, wartoscMaterialu, wartoscUslugi } from './obliczenia'
-import { maPozycjeSpozaCennika, tekstDoSchowka, wierszeSap, wierszeSzczegolow, type ZlecenieDoEksportu } from './eksportSap'
+import { cenaJednMaterialu, cenaUslugi, czySynthos, grosze, policzSumy, wartoscMaterialu, wartoscUslugi } from './obliczenia'
+import { liniiSap, maPozycjeSpozaCennika, tekstDoSchowka, wierszeSap, wierszeSzczegolow, type ZlecenieDoEksportu } from './eksportSap'
 import type { PozycjaCennika } from './types'
 import { parametrySilnika } from './szablony'
 
@@ -155,5 +155,71 @@ describe('usługi wewnętrzne innych MPK', () => {
     }
     expect(wierszeSzczegolow(z)[0][3]).toBe('Usługa wewnętrzna P07')
     expect(wierszeSap(z, new Map())[0].slice(0, 4)).toEqual([10, '5005060', 'Wyważ.śr.wirnika do 500mm kl.wyw.G-6,3', 1])
+  })
+})
+
+describe('braki godzin i materiału (uwagi działu handlowego 2026-11-21)', () => {
+  const stawka = (id: number, opis: string, indeks: string, cena: number) =>
+    ({ id, nr_pozycji: 310, numer_linii: id, indeks_sap: indeks, opis, jm: 'H', cena, aktywna: true })
+  const dzien = stawka(101, 'Ślusarz (7.00-15.00)', '5000000', 75)
+  const popoludnie = stawka(102, 'Ślusarz (15.00-19.00)', '5000001', 97)
+  const wolne = stawka(103, 'Ślusarz (dni wolne)', '5000003', 100)
+  const z: ZlecenieDoEksportu = {
+    id: 'b', mpk: 'P04', nr_zamowienia: '4200115426', pozycja_zamowienia: 10, nazwa: 'ROLER', linia_uslugi: 10, linia_materialy: 30,
+    pozycje_uslug: [
+      { ilosc: 20, cena: 75, doplata_proc: 0, kolejnosc: 0, cennik_pozycje: dzien },
+      { ilosc: 144, cena: 75, doplata_proc: 0, kolejnosc: 1, cennik_pozycje: dzien, mpk_wykonawcy: 'P07' },
+      { ilosc: 60, cena: 97, doplata_proc: 0, kolejnosc: 2, cennik_pozycje: popoludnie },
+      { ilosc: 16, cena: 100, doplata_proc: 0, kolejnosc: 3, cennik_pozycje: wolne },
+    ],
+    pozycje_materialowe: [
+      { nazwa: 'ŁOŻYSKO KULKOWE 3306', ilosc: 1, wartosc_zakupu: 240.4, narzut_proc: 12, dostawca: 'bioerg', kolejnosc: 0, brak: true },
+      { nazwa: 'ZMYWACZ', ilosc: 1, wartosc_zakupu: 12.98, narzut_proc: 12, dostawca: 'bioerg', kolejnosc: 1 },
+    ],
+    braki_godzin: [
+      { ilosc_rbg: 6, cennik_pozycje: dzien },
+      { ilosc_rbg: 60, cennik_pozycje: popoludnie },
+      { ilosc_rbg: 16, cennik_pozycje: wolne },
+    ],
+  }
+
+  it('20 rbg przepracowane, 6 brak -> 14 sprzedane + linia braku; braki per pora z własną stawką', () => {
+    const linie = liniiSap(z, new Map())
+    const opis = linie.map((l) => [l.wiersz[2], l.wiersz[3], l.wiersz[7], l.brak])
+    expect(opis).toEqual([
+      ['Ślusarz (7.00-15.00)', 14, 1050, false],
+      ['Ślusarz (7.00-15.00)', 6, 450, true],
+      ['Ślusarz (7.00-15.00)', 144, 10800, false], // kooperacja P07 - bez braków
+      ['Ślusarz (15.00-19.00)', 60, 5820, true],
+      ['Ślusarz (dni wolne)', 16, 1600, true],
+      ['ŁOŻYSKO KULKOWE 3306', 269.25, 269.25, true],
+      ['ZMYWACZ', 14.54, 14.54, false],
+    ])
+  })
+  it('do SAP i schowka idzie tylko sprzedana część', () => {
+    expect(wierszeSap(z, new Map()).map((w) => w[3])).toEqual([14, 144, 14.54])
+  })
+  it('sumy: braki osobno, poza wartością zlecenia', () => {
+    const cennik = new Map([dzien, popoludnie, wolne].map((c) => [c.id, c]))
+    const s = policzSumy(
+      z.pozycje_uslug.map((u) => ({ cennik_pozycja_id: u.cennik_pozycje!.id, ilosc: u.ilosc, doplata_proc: 0, cena: u.cena, mpk_wykonawcy: u.mpk_wykonawcy })),
+      z.pozycje_materialowe, cennik, [],
+      z.braki_godzin!.map((b) => ({ cennik_pozycja_id: b.cennik_pozycje!.id, ilosc_rbg: b.ilosc_rbg })),
+    )
+    expect(s.braki).toBe(450 + 5820 + 1600 + 269.25)
+    expect(s.razem).toBe(1050 + 10800 + 14.54)
+  })
+  it('stary brak bez godzin w komórce: linia braku po cenie z cennika, sprzedaż bez zmian', () => {
+    const linie = liniiSap({ ...z, pozycje_uslug: [], pozycje_materialowe: [], braki_godzin: [{ ilosc_rbg: 12, cennik_pozycje: dzien }] }, new Map())
+    expect(linie).toEqual([{ wiersz: [10, '5000000', 'Ślusarz (7.00-15.00)', 12, null, 'H', 75, 900, null, null, null], brak: true }])
+  })
+  it('XLSX: braki na czerwono w arkuszu zamówienia i w „Szczegółach”', async () => {
+    const { plikXlsx } = await import('./eksportSap')
+    const { default: XLSX } = await import('xlsx-js-style')
+    const wb = XLSX.read(new Uint8Array(await (await plikXlsx([z], new Map())).arrayBuffer()), { type: 'array', cellStyles: true })
+    const ws = wb.Sheets['4200115426-10']
+    const wiersze = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 })
+    expect(wiersze.length).toBe(8)
+    expect(wierszeSzczegolow(z).filter((w) => String(w[3]).startsWith('Brak')).length).toBe(4)
   })
 })

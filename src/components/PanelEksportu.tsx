@@ -5,7 +5,7 @@ import { useSlowniki } from '@/lib/slowniki'
 import { komunikatPL } from '@/lib/config'
 import { dataGodzinaPL, dzisiajISO, zl } from '@/lib/format'
 import {
-  KOLUMNY_KWOT, KOLUMNY_SAP, ukladFiori, etykietaZamowienia, maPozycjeSpozaCennika, pobierz, plikXlsx, sumaWierszy, tekstDoSchowka, wierszeSap,
+  KOLUMNY_KWOT, KOLUMNY_SAP, ukladFiori, etykietaZamowienia, liniiSap, maPozycjeSpozaCennika, pobierz, plikXlsx, sumaWierszy, tekstDoSchowka, wierszeSap,
   type ZlecenieDoEksportu,
 } from '@/lib/eksportSap'
 import { cn } from '@/lib/utils'
@@ -16,7 +16,8 @@ const ZAPYTANIE = `id, mpk, nr_zamowienia, pozycja_zamowienia, nazwa, mechanik, 
   uslugi_obce(id, opis, wykonawca, numer_faktury, wartosc_zakupu, narzut_proc, nr_linii_sap, kolejnosc),
   zalaczniki(typ, usluga_obca_id),
   pozycje_uslug(ilosc, cena, doplata_proc, kolejnosc, mpk_wykonawcy, wlasny_opis, wlasna_jm, wlasny_indeks, nr_linii_sap, cennik_pozycje(*)),
-  pozycje_materialowe(nazwa, ilosc, jm, wartosc_zakupu, narzut_proc, dostawca, kolejnosc, numer_faktury)`
+  pozycje_materialowe(nazwa, ilosc, jm, wartosc_zakupu, narzut_proc, dostawca, kolejnosc, numer_faktury, brak),
+  braki_godzin(ilosc_rbg, cennik_pozycje(*))`
 
 type ZlecenieZPanelu = ZlecenieDoEksportu & { mechanik: string | null; zlozono: string | null; bezSkanu: number }
 
@@ -39,6 +40,9 @@ function normalizuj(z: any): ZlecenieZPanelu {
       ...m, ilosc: Number(m.ilosc), wartosc_zakupu: Number(m.wartosc_zakupu), narzut_proc: Number(m.narzut_proc),
     })),
     uslugi_obce: (z.uslugi_obce ?? []).map((u: any) => ({ ...u, wartosc_zakupu: Number(u.wartosc_zakupu), narzut_proc: Number(u.narzut_proc) })),
+    braki_godzin: (z.braki_godzin ?? []).map((b: any) => ({
+      ilosc_rbg: Number(b.ilosc_rbg), cennik_pozycje: b.cennik_pozycje ? { ...b.cennik_pozycje, cena: Number(b.cennik_pozycje.cena) } : null,
+    })),
     // Usługi obce bez skanu faktury - w SAP skan jest obowiązkowy.
     bezSkanu: (z.uslugi_obce ?? []).filter((u: any) => !(z.zalaczniki ?? []).some((a: any) => a.typ === 'faktura_uslugi_obcej' && a.usluga_obca_id === u.id)).length,
   }
@@ -158,7 +162,9 @@ export function PanelEksportu({ otworz }: { otworz: (id: string) => void }) {
           </thead>
           <tbody>
             {widoczne.map((z) => {
-              const wiersze = wierszeSap(z, materialWgKategorii)
+              const linie = liniiSap(z, materialWgKategorii)
+              const wiersze = linie.filter((l) => !l.brak).map((l) => l.wiersz)
+              const sumaBrakow = sumaWierszy(linie.filter((l) => l.brak).map((l) => l.wiersz))
               const otwarte = rozwiniete.has(z.id)
               return (
                 <Fragment key={z.id}>
@@ -197,7 +203,10 @@ export function PanelEksportu({ otworz }: { otworz: (id: string) => void }) {
                     <td className="komorka">{z.mpk}</td>
                     <td className="komorka whitespace-nowrap text-xs text-slate-500">{dataGodzinaPL(z.zlozono)}</td>
                     <td className="komorka liczba">{wiersze.length}</td>
-                    <td className="komorka liczba font-medium">{zl(sumaWierszy(wiersze))}</td>
+                    <td className="komorka liczba font-medium">
+                      {zl(sumaWierszy(wiersze))}
+                      {sumaBrakow > 0 && <span className="block text-xs font-semibold text-red-700" title="Braki - nie sprzedajemy w tym zleceniu">braki {zl(sumaBrakow)}</span>}
+                    </td>
                     <td className="komorka">
                       <button className="inline-flex items-center gap-1 text-sm text-blekit-ciemny hover:underline" onClick={() => void kopiuj(z)}>
                         <ClipboardCopy className="h-4 w-4" /> Kopiuj
@@ -210,9 +219,9 @@ export function PanelEksportu({ otworz }: { otworz: (id: string) => void }) {
                         <table className="w-full border-collapse text-xs">
                           <thead><tr>{KOLUMNY_SAP.map((k) => <th key={k} className="komorka-naglowek">{k}</th>)}</tr></thead>
                           <tbody>
-                            {wiersze.map((w, i) => (
-                              <tr key={i} className="bg-white">
-                                {ukladFiori(w).map((c, j) => <td key={j} className={cn('komorka', typeof c === 'number' && 'liczba')}>{typeof c === 'number' && KOLUMNY_KWOT.has(j) ? zl(c) : c ?? ''}</td>)}
+                            {linie.map((l, i) => (
+                              <tr key={i} className={l.brak ? 'bg-red-50 font-semibold text-red-700' : 'bg-white'}>
+                                {ukladFiori(l.wiersz).map((c, j) => <td key={j} className={cn('komorka', typeof c === 'number' && 'liczba')}>{typeof c === 'number' && KOLUMNY_KWOT.has(j) ? zl(c) : c ?? ''}</td>)}
                               </tr>
                             ))}
                           </tbody>

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { Fragment, useMemo } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { useSlowniki } from '@/lib/slowniki'
 import { ETYKIETY_BRAKU, ETYKIETY_PORY, zl } from '@/lib/format'
@@ -24,8 +24,9 @@ interface Props {
  * Stawki i indeksy SAP pochodzą wyłącznie z cennika (widok stawki_robocizny) -
  * żadna komórka nie "zamraża" starej stawki, co było źródłem błędów w Excelu.
  * Godziny przepracowane przez inne MPK (kooperacja) są osobnymi wierszami poniżej.
- * Ostatnia kolumna to braki godzin (zleceniodawca założył za mało godzin) - zapisywane w braki_godzin
- * pod główną stawką stanowiska; ich status prowadzi dział handlowy w zakładce „Braki godzin”.
+ * Braki godzin (zamawiający założył mniej godzin) to część przepracowanych godzin danej komórki - czerwony
+ * wiersz „w tym brak” pod stanowiskiem, zapisywany w braki_godzin pod stawką tej komórki (stanowisko x pora).
+ * Do SAP idzie różnica; status braku prowadzi dział handlowy w zakładce „Braki godzin”.
  */
 export function SiatkaRobocizny({ uslugi, ustaw, mpkZlecenia, edycja, braki, ustawBraki }: Props) {
   const { stawki, mpk } = useSlowniki()
@@ -58,120 +59,147 @@ export function SiatkaRobocizny({ uslugi, ustaw, mpkZlecenia, edycja, braki, ust
     }
   }
 
-  /** Braki stanowiska (dowolna pora) - zapisane pod główną stawką: stała albo 7-15. */
-  function brakiStanowiska(pory: Map<Pora, Stawka>) {
-    const ids = new Set([...pory.values()].map((s) => s.cennik_pozycja_id))
-    return braki.filter((b) => b.cennik_pozycja_id !== null && ids.has(b.cennik_pozycja_id))
-  }
-  function ustawBrak(pory: Map<Pora, Stawka>, rbg: number) {
-    const lista = brakiStanowiska(pory)
+  /** Braki komórki siatki (stanowisko x pora) = braki zapisane pod tą stawką. */
+  const brakiStawki = (st: Stawka) => braki.filter((b) => b.cennik_pozycja_id === st.cennik_pozycja_id)
+  const sumaBrakuStawki = (st: Stawka) => brakiStawki(st).reduce((s, b) => s + b.ilosc_rbg, 0)
+  const godzinyStawki = (st: Stawka) => wlasne.filter((u) => u.cennik_pozycja_id === st.cennik_pozycja_id).reduce((s, u) => s + u.ilosc, 0)
+  function ustawBrak(st: Stawka, rbg: number) {
+    const lista = brakiStawki(st)
     if (lista.length) {
       ustawBraki(rbg > 0
         ? braki.map((b) => (b === lista[0] ? { ...b, ilosc_rbg: rbg } : b))
         : braki.filter((b) => b !== lista[0]))
     } else if (rbg > 0) {
-      const glowna = pory.get('stala') ?? pory.get('7-15') ?? [...pory.values()][0]
-      ustawBraki([...braki, { klucz: nowyKlucz(), cennik_pozycja_id: glowna.cennik_pozycja_id, stanowisko_tekst: null, ilosc_rbg: rbg, status: 'zgloszony', opis: null }])
+      ustawBraki([...braki, { klucz: nowyKlucz(), cennik_pozycja_id: st.cennik_pozycja_id, stanowisko_tekst: null, ilosc_rbg: rbg, status: 'zgloszony', opis: null }])
     }
   }
   const brakiBezStanowiska = braki.filter((b) => b.cennik_pozycja_id === null || !idStawek.has(b.cennik_pozycja_id))
   const sumaBrakow = braki.reduce((s, b) => s + b.ilosc_rbg, 0)
-  /** Wartość braku = rbg × stawka z cennika, pod którą brak jest zapisany (stała albo 7-15). */
+  /** Wartość braku = rbg × stawka komórki, w której brak jest wpisany. */
   const wartoscBraku = (b: BrakGodzin) => b.ilosc_rbg * (stawki.find((s) => s.cennik_pozycja_id === b.cennik_pozycja_id)?.cena ?? 0)
   const wartoscBrakow = grosze(braki.reduce((s, b) => s + wartoscBraku(b), 0))
 
   function cenaWiersza(u: PozycjaUslugi) {
     return u.cena ?? stawki.find((s) => s.cennik_pozycja_id === u.cennik_pozycja_id)?.cena ?? 0
   }
+  /** Wartość sprzedana komórki: przepracowane minus brak (brak nie idzie do SAP w tym zleceniu). */
+  function wartoscSprzedanaStawki(st: Stawka) {
+    let brak = sumaBrakuStawki(st)
+    return wlasne.filter((u) => u.cennik_pozycja_id === st.cennik_pozycja_id).reduce((s, u) => {
+      const zBraku = Math.min(brak, u.ilosc)
+      brak -= zBraku
+      return s + wartoscUslugi({ ...u, ilosc: u.ilosc - zBraku }, cenaWiersza(u))
+    }, 0)
+  }
 
   const sumaGodzin = wlasne.reduce((s, u) => s + u.ilosc, 0)
-  const sumaWartosci = [...wlasne, ...kooperacja].reduce((s, u) => s + wartoscUslugi(u, cenaWiersza(u)), 0)
+  const sumaWartosci = stawki.reduce((s, st) => s + wartoscSprzedanaStawki(st), 0)
+    + kooperacja.reduce((s, u) => s + wartoscUslugi(u, cenaWiersza(u)), 0)
   const inneMpk = mpk.filter((m) => m.kod !== mpkZlecenia)
+
+  /** Pole braku w komórce - czerwone; tylko do odczytu, gdy brak jest już uzupełniony / rozliczony. */
+  function poleBraku(nazwa: string, st: Stawka, etykieta: string, className?: string) {
+    const lista = brakiStawki(st)
+    const suma = sumaBrakuStawki(st)
+    const godziny = godzinyStawki(st)
+    const edytowalny = edycja && lista.length <= 1 && lista.every((b) => b.status === 'zgloszony')
+    const status = lista.find((b) => b.status !== 'zgloszony')?.status
+    const zaDuzo = suma > godziny
+    const podpowiedz = zaDuzo
+      ? `Brak (${suma}) większy niż przepracowane godziny (${godziny}) w tej komórce`
+      : status ? `Brak: ${ETYKIETY_BRAKU[status].toLowerCase()}` : `Brak godzin - ${etykieta} (część przepracowanych godzin)`
+    return (
+      <div className="flex items-center" title={podpowiedz}>
+        <PoleLiczby aria-label={`${nazwa} ${etykieta} - brak godzin`} wartosc={suma} disabled={!edytowalny}
+          zmien={(n) => ustawBrak(st, n)} placeholder="0"
+          className={cn(suma > 0 && 'font-semibold text-red-700', zaDuzo && 'ring-1 ring-red-500', className)} />
+        {status && <span className="whitespace-nowrap pr-2 text-[10px] text-slate-500">{ETYKIETY_BRAKU[status].toLowerCase()}</span>}
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
+      <p className="text-xs text-slate-500">
+        Wpisz <strong>wszystkie przepracowane godziny</strong>. Jeśli zamawiający założył w zamówieniu mniej, brakującą część wpisz
+        w czerwonym wierszu <strong>„w tym brak”</strong> pod stanowiskiem, w tej samej porze (np. 20 rbg przepracowane, w tym 6 brak - do SAP idzie 14).
+      </p>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr>
               <th className="komorka-naglowek">Stanowisko</th>
               {PORY.map((p) => <th key={p} className="komorka-naglowek text-right">{ETYKIETY_PORY[p]}</th>)}
-              <th className="komorka-naglowek text-right">Wartość [zł]</th>
-              <th className="komorka-naglowek w-28 text-right" title="Za mało godzin w zamówieniu Synthos - dział handlowy pilnuje uzupełnienia (zakładka „Braki godzin”)">
-                Brak godzin [rbg]
-              </th>
-              <th className="komorka-naglowek w-32 text-right" title="Brakujące rbg × stawka z cennika (dzienna 7-15 albo stała)">
-                Wartość braku [zł]
-              </th>
+              <th className="komorka-naglowek text-right" title="Wartość sprzedana w tym zleceniu (bez braków)">Wartość [zł]</th>
+              <th className="komorka-naglowek w-32 text-right" title="Brakujące rbg × stawka komórki (pory dnia)">Wartość braku [zł]</th>
             </tr>
           </thead>
           <tbody>
             {stanowiska.map(([nazwa, pory]) => {
-              const wartosc = [...pory.values()].reduce((s, st) => {
-                const u = wlasne.find((x) => x.cennik_pozycja_id === st.cennik_pozycja_id)
-                return s + (u ? wartoscUslugi(u, cenaWiersza(u)) : 0)
-              }, 0)
+              const stawkiWiersza = [...pory.values()]
+              const wartosc = stawkiWiersza.reduce((s, st) => s + wartoscSprzedanaStawki(st), 0)
+              const brakWiersza = stawkiWiersza.reduce((s, st) => s + sumaBrakuStawki(st), 0)
+              const wartoscBrakuWiersza = grosze(stawkiWiersza.reduce((s, st) => s + sumaBrakuStawki(st) * st.cena, 0))
+              // Wiersz braków tylko tam, gdzie są godziny albo już wpisany brak - siatka zostaje czytelna.
+              const pokazBraki = brakWiersza > 0 || stawkiWiersza.some((st) => godzinyStawki(st) > 0)
               const stala = pory.get('stala')
               return (
-                <tr key={nazwa}>
-                  <td className="komorka whitespace-nowrap font-medium">{nazwa}</td>
-                  {stala ? (
-                    <td colSpan={4} className="komorka">
-                      <div className="flex items-center gap-2">
-                        <span className="whitespace-nowrap text-xs text-slate-500">stawka stała {zl(stala.cena)} zł/h</span>
-                        <PoleLiczby
-                          aria-label={`${nazwa} - godziny`}
-                          wartosc={wlasne.find((u) => u.cennik_pozycja_id === stala.cennik_pozycja_id)?.ilosc ?? 0}
-                          zmien={(n) => ustawGodziny(stala, n)}
-                          disabled={!edycja}
-                          className="max-w-24"
-                          placeholder="rbg"
-                        />
-                      </div>
-                    </td>
-                  ) : PORY.map((p) => {
-                    const st = pory.get(p)
-                    if (!st) return <td key={p} className="komorka bg-slate-50" />
-                    const u = wlasne.find((x) => x.cennik_pozycja_id === st.cennik_pozycja_id)
-                    return (
-                      <td key={p} className="komorka p-0" title={`${zl(st.cena)} zł/h · indeks SAP ${st.indeks_sap}`}>
-                        <div className="flex items-center">
+                <Fragment key={nazwa}>
+                  <tr>
+                    <td className="komorka whitespace-nowrap font-medium">{nazwa}</td>
+                    {stala ? (
+                      <td colSpan={4} className="komorka">
+                        <div className="flex items-center gap-2">
+                          <span className="whitespace-nowrap text-xs text-slate-500">stawka stała {zl(stala.cena)} zł/h</span>
                           <PoleLiczby
-                            aria-label={`${nazwa} ${ETYKIETY_PORY[p]}`}
-                            wartosc={u?.ilosc ?? 0}
-                            zmien={(n) => ustawGodziny(st, n)}
+                            aria-label={`${nazwa} - godziny`}
+                            wartosc={wlasne.find((u) => u.cennik_pozycja_id === stala.cennik_pozycja_id)?.ilosc ?? 0}
+                            zmien={(n) => ustawGodziny(stala, n)}
                             disabled={!edycja}
-                            placeholder="0"
+                            className="max-w-24"
+                            placeholder="rbg"
                           />
-                          <span className="whitespace-nowrap pr-2 text-[10px] text-slate-400">× {zl(u?.cena ?? st.cena)}</span>
                         </div>
                       </td>
-                    )
-                  })}
-                  <td className="komorka liczba">{wartosc ? zl(wartosc) : ''}</td>
-                  {(() => {
-                    const lista = brakiStanowiska(pory)
-                    const suma = lista.reduce((s, b) => s + b.ilosc_rbg, 0)
-                    // Brak już uzupełniony / rozliczony przez dział handlowy - tylko do odczytu.
-                    const edytowalny = edycja && lista.length <= 1 && lista.every((b) => b.status === 'zgloszony')
-                    const status = lista.find((b) => b.status !== 'zgloszony')?.status
-                    const wartoscWiersza = grosze(lista.reduce((s, b) => s + wartoscBraku(b), 0))
-                    // Braki na czerwono, żeby od razu rzucały się w oczy.
-                    return (
-                      <>
-                        <td className={cn('komorka p-0', suma > 0 ? 'bg-red-50' : 'bg-slate-50/60')} title={status ? `Brak: ${ETYKIETY_BRAKU[status].toLowerCase()}` : undefined}>
-                          <PoleLiczby aria-label={`${nazwa} - brak godzin`} wartosc={suma} disabled={!edytowalny}
-                            zmien={(n) => ustawBrak(pory, n)} placeholder="0"
-                            className={suma > 0 ? 'font-semibold text-red-700' : undefined} />
-                          {status && <span className="block px-2 pb-0.5 text-right text-[10px] text-slate-500">{ETYKIETY_BRAKU[status].toLowerCase()}</span>}
+                    ) : PORY.map((p) => {
+                      const st = pory.get(p)
+                      if (!st) return <td key={p} className="komorka bg-slate-50" />
+                      const u = wlasne.find((x) => x.cennik_pozycja_id === st.cennik_pozycja_id)
+                      return (
+                        <td key={p} className="komorka p-0" title={`${zl(st.cena)} zł/h · indeks SAP ${st.indeks_sap}`}>
+                          <div className="flex items-center">
+                            <PoleLiczby
+                              aria-label={`${nazwa} ${ETYKIETY_PORY[p]}`}
+                              wartosc={u?.ilosc ?? 0}
+                              zmien={(n) => ustawGodziny(st, n)}
+                              disabled={!edycja}
+                              placeholder="0"
+                            />
+                            <span className="whitespace-nowrap pr-2 text-[10px] text-slate-400">× {zl(u?.cena ?? st.cena)}</span>
+                          </div>
                         </td>
-                        <td className={cn('komorka liczba', suma > 0 && 'bg-red-50 font-semibold text-red-700')}>
-                          {wartoscWiersza ? zl(wartoscWiersza) : ''}
-                        </td>
-                      </>
-                    )
-                  })()}
-                </tr>
+                      )
+                    })}
+                    <td className="komorka liczba">{wartosc ? zl(wartosc) : ''}</td>
+                    <td className={cn('komorka liczba', brakWiersza > 0 && 'bg-red-50 font-semibold text-red-700')}>
+                      {wartoscBrakuWiersza ? zl(wartoscBrakuWiersza) : ''}
+                    </td>
+                  </tr>
+                  {pokazBraki && (
+                    <tr className="bg-red-50/50">
+                      <td className="komorka whitespace-nowrap pl-6 text-xs font-medium text-red-700">↳ w tym brak [rbg]</td>
+                      {stala ? (
+                        <td colSpan={4} className="komorka p-0">{poleBraku(nazwa, stala, 'stawka stała', 'max-w-24')}</td>
+                      ) : PORY.map((p) => {
+                        const st = pory.get(p)
+                        if (!st || (godzinyStawki(st) === 0 && sumaBrakuStawki(st) === 0)) return <td key={p} className="komorka" />
+                        return <td key={p} className="komorka p-0">{poleBraku(nazwa, st, ETYKIETY_PORY[p])}</td>
+                      })}
+                      <td className="komorka" />
+                      <td className="komorka" />
+                    </tr>
+                  )}
+                </Fragment>
               )
             })}
           </tbody>

@@ -72,9 +72,12 @@ export function TabelaMaterialow({ materialy, ustaw, edycja }: Props) {
     }
   }
 
-  const doRozliczenia = materialy.filter((m) => !czySynthos(m.dostawca))
+  // Braki (materiał niesprzedany w tym zleceniu) nie wchodzą do sumy sprzedaży - pokazane osobno.
+  const doRozliczenia = materialy.filter((m) => !czySynthos(m.dostawca) && !m.brak)
   const sumaZakupu = grosze(doRozliczenia.reduce((s, m) => s + m.wartosc_zakupu, 0))
   const sumaRazem = grosze(doRozliczenia.reduce((s, m) => s + wartoscMaterialu(m), 0))
+  const braki = materialy.filter((m) => !czySynthos(m.dostawca) && m.brak)
+  const sumaBrakow = grosze(braki.reduce((s, m) => s + wartoscMaterialu(m), 0))
 
   return (
     <div className="space-y-2">
@@ -92,6 +95,8 @@ export function TabelaMaterialow({ materialy, ustaw, edycja }: Props) {
               <th className="komorka-naglowek w-24 text-right">Narzut [zł]</th>
               <th className="komorka-naglowek w-28 text-right">Wartość z narzutem</th>
               <th className="komorka-naglowek w-32" title="Dokument źródłowy zakupu z Optimy (PZ / FZ) albo numer faktury">Dokument (PZ/FZ)</th>
+              <th className="komorka-naglowek w-14 text-center"
+                title="Brak: materiał zużyty, ale zamawiający nie założył go w zamówieniu - nie sprzedajemy go w tym zleceniu (w XLSX na czerwono)">Brak</th>
               <th className="komorka-naglowek w-10" />
             </tr>
           </thead>
@@ -100,7 +105,7 @@ export function TabelaMaterialow({ materialy, ustaw, edycja }: Props) {
               const synthos = czySynthos(m.dostawca)
               const zNarzutem = wartoscMaterialu(m)
               return (
-                <tr key={m.klucz} className={synthos ? 'bg-slate-50 text-slate-500' : undefined}>
+                <tr key={m.klucz} className={synthos ? 'bg-slate-50 text-slate-500' : m.brak ? 'bg-red-50 text-red-700' : undefined}>
                   <td className="komorka p-0">
                     <KomorkaNazwy
                       wartosc={m.nazwa}
@@ -156,6 +161,12 @@ export function TabelaMaterialow({ materialy, ustaw, edycja }: Props) {
                       onChange={(e) => zmien(m, { numer_faktury: e.target.value || null })} />
                   </td>
                   <td className="komorka text-center">
+                    {!synthos && (
+                      <input type="checkbox" disabled={!edycja} checked={!!m.brak} aria-label="Brak - nie sprzedajemy w tym zleceniu"
+                        className="accent-red-600" onChange={(e) => zmien(m, { brak: e.target.checked })} />
+                    )}
+                  </td>
+                  <td className="komorka text-center">
                     {edycja && (
                       <button aria-label="Usuń materiał" onClick={() => ustaw(materialy.filter((x) => x !== m))} className="text-slate-400 hover:text-red-600">
                         <Trash2 className="h-4 w-4" />
@@ -166,19 +177,26 @@ export function TabelaMaterialow({ materialy, ustaw, edycja }: Props) {
               )
             })}
             {materialy.length === 0 && (
-              <tr><td colSpan={11} className="komorka py-4 text-center text-sm text-slate-500">Brak materiałów.</td></tr>
+              <tr><td colSpan={12} className="komorka py-4 text-center text-sm text-slate-500">Brak materiałów.</td></tr>
             )}
           </tbody>
           {materialy.length > 0 && (
             <tfoot>
               <tr className="font-medium">
-                <td className="komorka text-right" colSpan={4}>Razem (bez materiału Synthos)</td>
+                <td className="komorka text-right" colSpan={4}>Razem sprzedane (bez materiału Synthos{braki.length ? ' i braków' : ''})</td>
                 <td className="komorka liczba">{zl(sumaZakupu)}</td>
                 <td className="komorka" colSpan={2} />
                 <td className="komorka liczba">{zl(grosze(sumaRazem - sumaZakupu))}</td>
                 <td className="komorka liczba">{zl(sumaRazem)}</td>
-                <td className="komorka" colSpan={2} />
+                <td className="komorka" colSpan={3} />
               </tr>
+              {braki.length > 0 && (
+                <tr className="bg-red-50 font-semibold text-red-700">
+                  <td className="komorka text-right" colSpan={8}>Braki - materiał niesprzedany w tym zleceniu ({braki.length} poz.)</td>
+                  <td className="komorka liczba">{zl(sumaBrakow)}</td>
+                  <td className="komorka" colSpan={3} />
+                </tr>
+              )}
             </tfoot>
           )}
         </table>

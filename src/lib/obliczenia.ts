@@ -49,18 +49,66 @@ export interface Sumy {
   cennik: number
   materialy: number
   uslugiObce: number
+  /** Sprzedawane w tym zleceniu (bez braków). */
   razem: number
+  /** Wartość braków: godzin i materiału, których zamawiający nie założył w zamówieniu. */
+  braki: number
+}
+
+/** Brak godzin w komórce siatki: stawka (stanowisko x pora) i liczba brakujących rbg. */
+export interface BrakGodzinDoRozliczenia {
+  cennik_pozycja_id: number | null
+  ilosc_rbg: number
+}
+
+/**
+ * Brak godzin to CZĘŚĆ przepracowanych godzin z danej komórki (np. 20 rbg przepracowane, zamawiający
+ * założył 14 -> 14 sprzedane, 6 brak). Rozdziela braki na wiersze robocizny własnej o tej samej stawce
+ * (kooperacja innego MPK nie ma braków). `nadwyzka` = brak bez godzin w komórce (stare wpisy) - liczony
+ * w brakach po cenie z cennika, sprzedaży nie zmniejsza.
+ */
+export function przydzielBraki<T extends { cennik_pozycja_id: number | null; ilosc: number; mpk_wykonawcy?: string | null }>(
+  uslugi: T[], braki: BrakGodzinDoRozliczenia[],
+): { naWiersz: Map<T, number>; nadwyzka: Map<number, number> } {
+  const pozostalo = new Map<number, number>()
+  for (const b of braki) {
+    if (b.cennik_pozycja_id === null || !(b.ilosc_rbg > 0)) continue
+    pozostalo.set(b.cennik_pozycja_id, (pozostalo.get(b.cennik_pozycja_id) ?? 0) + b.ilosc_rbg)
+  }
+  const naWiersz = new Map<T, number>()
+  for (const u of uslugi) {
+    if (u.mpk_wykonawcy || u.cennik_pozycja_id === null) continue
+    const reszta = pozostalo.get(u.cennik_pozycja_id) ?? 0
+    const ile = Math.min(reszta, u.ilosc)
+    if (ile > 0) {
+      naWiersz.set(u, ile)
+      pozostalo.set(u.cennik_pozycja_id, reszta - ile)
+    }
+  }
+  for (const [k, v] of pozostalo) if (v <= 0) pozostalo.delete(k)
+  return { naWiersz, nadwyzka: pozostalo }
 }
 
 export function policzSumy(
-  uslugi: Pick<PozycjaUslugi, 'cennik_pozycja_id' | 'ilosc' | 'doplata_proc' | 'cena' | 'wlasna_cena'>[],
-  materialy: Pick<PozycjaMaterialowa, 'wartosc_zakupu' | 'narzut_proc' | 'dostawca'>[],
+  uslugi: (Pick<PozycjaUslugi, 'cennik_pozycja_id' | 'ilosc' | 'doplata_proc' | 'cena' | 'wlasna_cena'> & { mpk_wykonawcy?: string | null })[],
+  materialy: Pick<PozycjaMaterialowa, 'wartosc_zakupu' | 'narzut_proc' | 'dostawca' | 'brak'>[],
   cennik: Map<number, PozycjaCennika>,
   uslugiObce: Pick<UslugaObca, 'wartosc_zakupu' | 'narzut_proc'>[] = [],
+  brakiGodzin: BrakGodzinDoRozliczenia[] = [],
 ): Sumy {
   let robocizna = 0
   let pozycjeCennikowe = 0
-  for (const u of uslugi) {
+  let braki = 0
+  const { naWiersz, nadwyzka } = przydzielBraki(uslugi, brakiGodzin)
+  for (const [id, ile] of nadwyzka) braki += grosze(ile * (cennik.get(id)?.cena ?? 0))
+  for (const wiersz of uslugi) {
+    // Brak zmniejsza sprzedaż wiersza i liczy się osobno.
+    const brak = naWiersz.get(wiersz) ?? 0
+    const u = brak ? { ...wiersz, ilosc: wiersz.ilosc - brak } : wiersz
+    if (brak) {
+      const cena = wiersz.cena ?? (wiersz.cennik_pozycja_id === null ? undefined : cennik.get(wiersz.cennik_pozycja_id)?.cena) ?? 0
+      braki += wartoscUslugi({ ...wiersz, ilosc: brak }, cena)
+    }
     if (u.cennik_pozycja_id === null) {
       // Pozycja spoza cennika - cena wpisana ręcznie.
       pozycjeCennikowe += wartoscUslugi(u, u.cena ?? u.wlasna_cena ?? 0)
@@ -73,7 +121,9 @@ export function policzSumy(
     if (poz.nr_pozycji === 310) robocizna += w
     else pozycjeCennikowe += w
   }
-  const mat = materialy.filter((m) => !czySynthos(m.dostawca)).reduce((s, m) => s + wartoscMaterialu(m), 0)
+  const doRozliczenia = materialy.filter((m) => !czySynthos(m.dostawca))
+  const mat = doRozliczenia.filter((m) => !m.brak).reduce((s, m) => s + wartoscMaterialu(m), 0)
+  braki += doRozliczenia.filter((m) => m.brak).reduce((s, m) => s + wartoscMaterialu(m), 0)
   const obce = uslugiObce.reduce((s, u) => s + wartoscUslugiObcej(u), 0)
   return {
     robocizna: grosze(robocizna),
@@ -81,6 +131,7 @@ export function policzSumy(
     materialy: grosze(mat),
     uslugiObce: grosze(obce),
     razem: grosze(robocizna + pozycjeCennikowe + mat + obce),
+    braki: grosze(braki),
   }
 }
 

@@ -28,9 +28,11 @@ interface Wiersz {
   status: StatusZlecenia
   zmodyfikowano: string
   komentarz_handlowca: string | null
-  pozycje_uslug: { ilosc: number; cena: number; doplata_proc: number; cennik_pozycja_id: number | null }[]
-  pozycje_materialowe: { wartosc_zakupu: number; narzut_proc: number; dostawca: Dostawca }[]
+  pozycje_uslug: { ilosc: number; cena: number; doplata_proc: number; cennik_pozycja_id: number | null; mpk_wykonawcy: string | null }[]
+  pozycje_materialowe: { wartosc_zakupu: number; narzut_proc: number; dostawca: Dostawca; brak: boolean }[]
   uslugi_obce: { wartosc_zakupu: number; narzut_proc: number }[]
+  /** Braki godzin - wartość zlecenia na liście to sprzedaż bez braków. */
+  braki_godzin: { cennik_pozycja_id: number | null; ilosc_rbg: number }[]
   wartosc: number
   /** Okres rozliczenia odczytany z numeru AZO; null, gdy numer go nie zawiera. */
   okres: OkresZAzo | null
@@ -129,8 +131,9 @@ export function ListaZlecen({ profil, otworz }: Props) {
     const { data, error } = await supabase
       .from('zlecenia')
       .select(`id, mpk, nr_zamowienia, pozycja_zamowienia, nazwa, mechanik, konto, nr_azo, dokument, status, zmodyfikowano, komentarz_handlowca,
-               pozycje_uslug(ilosc, cena, doplata_proc, cennik_pozycja_id),
-               pozycje_materialowe(wartosc_zakupu, narzut_proc, dostawca),
+               pozycje_uslug(ilosc, cena, doplata_proc, cennik_pozycja_id, mpk_wykonawcy),
+               braki_godzin(cennik_pozycja_id, ilosc_rbg),
+               pozycje_materialowe(wartosc_zakupu, narzut_proc, dostawca, brak),
                uslugi_obce(wartosc_zakupu, narzut_proc)`)
       .order('zmodyfikowano', { ascending: false })
       .limit(2000)
@@ -147,6 +150,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
         w.pozycje_materialowe.map((m) => ({ ...m, wartosc_zakupu: Number(m.wartosc_zakupu), narzut_proc: Number(m.narzut_proc) })),
         cennik,
         (w.uslugi_obce ?? []).map((u) => ({ wartosc_zakupu: Number(u.wartosc_zakupu), narzut_proc: Number(u.narzut_proc) })),
+        (w.braki_godzin ?? []).map((b) => ({ cennik_pozycja_id: b.cennik_pozycja_id, ilosc_rbg: Number(b.ilosc_rbg) })),
       ).razem,
     })))
   }, [cennik])

@@ -6,7 +6,7 @@ import { komunikatPL } from '@/lib/config'
 import { ETYKIETY_STATUSU, KOLORY_STATUSU, dataGodzinaPL, zl } from '@/lib/format'
 import { czySynthos, grosze, nowyKlucz, policzSumy, wartoscMaterialu } from '@/lib/obliczenia'
 import { SZABLONY, brakiKarty, parametrySilnika, szablon } from '@/lib/szablony'
-import { KOLUMNY_KWOT, KOLUMNY_SAP, ukladFiori, etykietaZamowienia, plikXlsx, pobierz, tekstDoSchowka, wierszeSap, type ZlecenieDoEksportu } from '@/lib/eksportSap'
+import { KOLUMNY_KWOT, KOLUMNY_SAP, ukladFiori, etykietaZamowienia, liniiSap, plikXlsx, pobierz, tekstDoSchowka, type ZlecenieDoEksportu } from '@/lib/eksportSap'
 import type {
   BrakGodzin, KartaRemontowa, PozycjaMaterialowa, PozycjaUslugi, Profil, StatusZlecenia, Zlecenie, UslugaObca, Zalacznik,
 } from '@/lib/types'
@@ -86,7 +86,7 @@ function zBazy(z: any): Stan {
     })),
     materialy: [...(z.pozycje_materialowe ?? [])].sort((a: any, b: any) => a.kolejnosc - b.kolejnosc || a.id - b.id).map((m: any) => ({
       id: m.id, klucz: `m${m.id}`, nazwa: m.nazwa, ilosc: Number(m.ilosc), jm: m.jm, wartosc_zakupu: Number(m.wartosc_zakupu),
-      dostawca: m.dostawca, narzut_proc: Number(m.narzut_proc), numer_faktury: m.numer_faktury,
+      dostawca: m.dostawca, narzut_proc: Number(m.narzut_proc), numer_faktury: m.numer_faktury, brak: !!m.brak,
     })),
     karty: [...(z.karty_remontowe ?? [])].sort((a: any, b: any) => a.utworzono.localeCompare(b.utworzono)).map((k: any) => ({
       id: k.id, klucz: `k${k.id}`, numer_karty: k.numer_karty ?? '', szablon: k.szablon, urzadzenie_nazwa: k.urzadzenie_nazwa ?? '',
@@ -175,7 +175,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
       const nowy: Stan = {
         naglowek: { ...s.naglowek, nr_zamowienia: '', pozycja_zamowienia: '', linia_uslugi: '', linia_materialy: '', data_przyjecia: '', data_zakonczenia: '', uwagi: '', dokument: '' },
         uslugi: s.uslugi.map((u) => ({ ...u, id: undefined, cena: undefined, nr_linii_sap: null, klucz: nowyKlucz() })),
-        materialy: s.materialy.map((m) => ({ ...m, id: undefined, klucz: nowyKlucz() })),
+        materialy: s.materialy.map((m) => ({ ...m, id: undefined, brak: false, klucz: nowyKlucz() })),
         karty: [], braki: [], uslugiObce: [],
       }
       setStan(nowy)
@@ -227,7 +227,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
   const ustaw = <K extends keyof Stan>(klucz: K) => (wartosc: Stan[K]) => setStan((s) => ({ ...s, [klucz]: wartosc }))
   const ustawNaglowek = (zmiana: Partial<Naglowek>) => setStan((s) => ({ ...s, naglowek: { ...s.naglowek, ...zmiana } }))
 
-  const sumy = useMemo(() => policzSumy(uslugi, materialy, cennik, uslugiObce), [uslugi, materialy, cennik, uslugiObce])
+  const sumy = useMemo(() => policzSumy(uslugi, materialy, cennik, uslugiObce, braki), [uslugi, materialy, cennik, uslugiObce, braki])
   const kartWSkanach = zalaczniki.filter((z) => z.typ === 'karta_remontowa').reduce((s, z) => s + z.liczba_kart, 0)
 
   // Silniki z pozycji cennika (po jednym na sztukę) - źródło mocy/napięcia/obrotów dla kart silników.
@@ -466,10 +466,15 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
       pozycje_materialowe: bezPustychMaterialow(materialy).map((m, i) => ({ ...m, kolejnosc: i })),
       uslugi_obce: uslugiObce.filter((u) => u.opis.trim()).map((u, i) => ({ ...u, kolejnosc: i })),
       nr_azo: nrAzo || null, konto: naglowek.konto || null,
+      braki_godzin: braki.filter((b) => b.ilosc_rbg > 0).map((b) => ({
+        ilosc_rbg: b.ilosc_rbg, cennik_pozycje: b.cennik_pozycja_id === null ? null : cennik.get(b.cennik_pozycja_id) ?? null,
+      })),
     }
     return z
-  }, [idZrodla, naglowek, uslugi, materialy, uslugiObce, nrAzo, cennik])
-  const podgladSap = useMemo(() => wierszeSap(doEksportu, materialWgKategorii), [doEksportu, materialWgKategorii])
+  }, [idZrodla, naglowek, uslugi, materialy, uslugiObce, nrAzo, cennik, braki])
+  // Podgląd z brakami (na czerwono); do schowka / SAP idą tylko linie sprzedane.
+  const liniePodgladu = useMemo(() => liniiSap(doEksportu, materialWgKategorii), [doEksportu, materialWgKategorii])
+  const podgladSap = useMemo(() => liniePodgladu.filter((l) => !l.brak).map((l) => l.wiersz), [liniePodgladu])
 
   async function pobierzXlsx() {
     setBlad(null)
@@ -672,13 +677,15 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
           <table className="w-full border-collapse text-xs">
             <thead><tr>{KOLUMNY_SAP.map((k) => <th key={k} className="komorka-naglowek">{k}</th>)}</tr></thead>
             <tbody>
-              {podgladSap.map((w, i) => (
-                <tr key={i}>{ukladFiori(w).map((c, j) => <td key={j} className={cn('komorka', typeof c === 'number' && 'liczba')}>{typeof c === 'number' && KOLUMNY_KWOT.has(j) ? zl(c) : c ?? ''}</td>)}</tr>
+              {liniePodgladu.map((l, i) => (
+                <tr key={i} className={l.brak ? 'bg-red-50 font-semibold text-red-700' : undefined} title={l.brak ? 'Brak - nie sprzedajemy w tym zleceniu (nie trafia do schowka)' : undefined}>
+                  {ukladFiori(l.wiersz).map((c, j) => <td key={j} className={cn('komorka', typeof c === 'number' && 'liczba')}>{typeof c === 'number' && KOLUMNY_KWOT.has(j) ? zl(c) : c ?? ''}</td>)}
+                </tr>
               ))}
             </tbody>
           </table>
           {(() => {
-            const mat = bezPustychMaterialow(materialy).filter((m) => !czySynthos(m.dostawca))
+            const mat = bezPustychMaterialow(materialy).filter((m) => !czySynthos(m.dostawca) && !m.brak)
             if (!mat.length) return null
             const zakup = grosze(mat.reduce((s, m) => s + m.wartosc_zakupu, 0))
             const razem = grosze(mat.reduce((s, m) => s + wartoscMaterialu(m), 0))
@@ -689,6 +696,12 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
               </p>
             )
           })()}
+          {liniePodgladu.some((l) => l.brak) && (
+            <p className="mt-2 rounded bg-red-50 px-3 py-2 text-xs text-red-800">
+              Wiersze na czerwono to <strong>braki</strong> (godziny lub materiał, których zamawiający nie założył) - w XLSX też są czerwone,
+              a do schowka trafiają tylko linie sprzedane.
+            </p>
+          )}
           {podgladSap.some((w) => w[0] === null) && (
             <p className="mt-2 rounded bg-amber-50 px-3 py-2 text-xs text-amber-900">
               Brak numeru linii zamówienia w części wierszy - numer nadaje Synthos w zamówieniu. Wpisz go w nagłówku („Nr linii zam.”) albo uzupełnij w SAP po wklejeniu.
@@ -732,6 +745,11 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
           <span>Materiały: <strong className="tabular-nums">{zl(sumy.materialy)}</strong></span>
           {sumy.uslugiObce > 0 && <span>Usługi obce: <strong className="tabular-nums">{zl(sumy.uslugiObce)}</strong></span>}
           <span className="text-base">Razem: <strong className="tabular-nums">{zl(sumy.razem)} zł</strong></span>
+          {sumy.braki > 0 && (
+            <span className="text-red-700" title="Godziny i materiał oznaczone jako brak - nie sprzedawane w tym zleceniu">
+              Braki: <strong className="tabular-nums">{zl(sumy.braki)} zł</strong>
+            </span>
+          )}
           {blad && <span className="rounded bg-red-50 px-2 py-1 text-red-700">{blad}</span>}
           {komunikat && !blad && <span className="rounded bg-limonka-jasna px-2 py-1 text-limonka-ciemna">{komunikat}</span>}
           <div className="ml-auto flex gap-2">

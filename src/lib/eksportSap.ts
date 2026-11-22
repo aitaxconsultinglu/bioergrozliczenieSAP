@@ -26,7 +26,7 @@
  *     jeśli kierownik go wpisał, opis/JM/cena wpisane ręcznie. Panel oznacza takie
  *     zlecenia do weryfikacji przez dział handlowy.
  */
-import { cenaJednMaterialu, cenaUslugi, czySynthos, grosze, wartoscMaterialu, wartoscUslugi, wartoscUslugiObcej } from './obliczenia'
+import { cenaJednMaterialu, cenaUslugi, czySynthos, grosze, przydzielBraki, wartoscMaterialu, wartoscUslugi, wartoscUslugiObcej } from './obliczenia'
 import type { Dostawca, PozycjaCennika } from './types'
 
 /** Pełny wiersz rozliczenia (11 pól z BRIEF 3.5) - z niego powstaje układ do wklejenia. */
@@ -104,7 +104,17 @@ export interface ZlecenieDoEksportu {
     kolejnosc: number
     jm?: string
     numer_faktury?: string | null
+    /** Materiał niesprzedany w tym zleceniu (brak zgłoszony zamawiającemu). */
+    brak?: boolean
   }[]
+  /** Braki godzin: część przepracowanych godzin z komórki siatki, której zamawiający nie założył. */
+  braki_godzin?: { ilosc_rbg: number; cennik_pozycje: PozycjaCennika | null }[]
+}
+
+/** Linia rozliczenia; `brak` = nie sprzedajemy jej w tym zleceniu (w XLSX i podglądzie na czerwono). */
+export interface LiniaSap {
+  wiersz: WierszSap
+  brak: boolean
 }
 
 /** Wszystkie pozycje materiałowe cennika (stary indeks 5004062) wg kategorii - do wyboru numeru linii. */
@@ -122,43 +132,71 @@ function kategoriaMaterialu(z: ZlecenieDoEksportu, materialy: MaterialWgKategori
   return materialy.get(pierwsza ?? GRUPA_ROBOCIZNY) ?? materialy.get(GRUPA_ROBOCIZNY)
 }
 
-export function wierszeSap(z: ZlecenieDoEksportu, materialy: MaterialWgKategorii): WierszSap[] {
-  const wiersze: WierszSap[] = []
+/**
+ * Wszystkie linie rozliczenia razem z brakami. Brak godzin to część godzin z komórki siatki: wiersz
+ * robocizny dzieli się na sprzedaną część i linię braku zaraz pod nią (ten sam indeks i cena).
+ * Materiał oznaczony jako brak idzie w całości jako linia braku.
+ */
+export function liniiSap(z: ZlecenieDoEksportu, materialy: MaterialWgKategorii): LiniaSap[] {
+  const linie: LiniaSap[] = []
+  const dodaj = (wiersz: WierszSap, brak = false) => linie.push({ wiersz, brak })
   // Pozycje z cennika wg kategorii i linii; pozycje spoza cennika na końcu, w kolejności wpisu.
   const klucz = (u: ZlecenieDoEksportu['pozycje_uslug'][number]) =>
     u.cennik_pozycje ? u.cennik_pozycje.nr_pozycji * 100000 + u.cennik_pozycje.numer_linii : 1e12 + u.kolejnosc
   const uslugi = [...z.pozycje_uslug].sort((a, b) => klucz(a) - klucz(b))
+  const braki = (z.braki_godzin ?? []).map((b) => ({ cennik_pozycja_id: b.cennik_pozycje?.id ?? null, ilosc_rbg: Number(b.ilosc_rbg) }))
+  const { naWiersz, nadwyzka } = przydzielBrakiUslug(uslugi, braki)
   for (const u of uslugi) {
     const c = u.cennik_pozycje
-    if (!c) {
-      wiersze.push([
-        u.nr_linii_sap ?? z.linia_uslugi ?? null, u.wlasny_indeks ?? '', (u.wlasny_opis ?? '').slice(0, MAKS_KROTKI_TEKST), Number(u.ilosc), null,
-        u.wlasna_jm ?? 'JD', cenaUslugi(u, Number(u.cena)), wartoscUslugi(u, Number(u.cena)), null, null, null,
-      ])
-      continue
-    }
-    wiersze.push([
-      u.nr_linii_sap ?? z.linia_uslugi ?? null, c.indeks_sap, c.opis.slice(0, MAKS_KROTKI_TEKST), Number(u.ilosc), null, c.jm,
-      cenaUslugi(u, Number(u.cena)), wartoscUslugi(u, Number(u.cena)), null, null, null,
-    ])
+    const brak = naWiersz.get(u) ?? 0
+    const sprzedane = Number(u.ilosc) - brak
+    const wiersz = (ilosc: number): WierszSap => c
+      ? [u.nr_linii_sap ?? z.linia_uslugi ?? null, c.indeks_sap, c.opis.slice(0, MAKS_KROTKI_TEKST), ilosc, null, c.jm,
+          cenaUslugi(u, Number(u.cena)), wartoscUslugi({ ...u, ilosc }, Number(u.cena)), null, null, null]
+      : [u.nr_linii_sap ?? z.linia_uslugi ?? null, u.wlasny_indeks ?? '', (u.wlasny_opis ?? '').slice(0, MAKS_KROTKI_TEKST), ilosc, null,
+          u.wlasna_jm ?? 'JD', cenaUslugi(u, Number(u.cena)), wartoscUslugi({ ...u, ilosc }, Number(u.cena)), null, null, null]
+    if (sprzedane > 0 || !brak) dodaj(wiersz(sprzedane))
+    if (brak) dodaj(wiersz(brak), true)
+  }
+  // Brak bez przepracowanych godzin w tej komórce (stare wpisy) - linia braku po cenie z cennika.
+  for (const b of z.braki_godzin ?? []) {
+    const c = b.cennik_pozycje
+    const ile = c ? nadwyzka.get(c.id) : undefined
+    if (!c || !ile) continue
+    nadwyzka.delete(c.id)
+    dodaj([z.linia_uslugi ?? null, c.indeks_sap, c.opis.slice(0, MAKS_KROTKI_TEKST), ile, null, c.jm, Number(c.cena), grosze(ile * Number(c.cena)), null, null, null], true)
   }
   const mat = kategoriaMaterialu(z, materialy)
   for (const m of [...z.pozycje_materialowe].sort((a, b) => a.kolejnosc - b.kolejnosc)) {
     if (czySynthos(m.dostawca)) continue
     const wartosc = wartoscMaterialu(m)
-    wiersze.push([
+    dodaj([
       z.linia_materialy ?? null, INDEKS_MATERIALU, m.nazwa.slice(0, MAKS_KROTKI_TEKST), wartosc, null,
       mat?.jm ?? 'JD', 1, wartosc, cenaJednMaterialu(m), Number(m.ilosc), null,
-    ])
+    ], !!m.brak)
   }
   for (const u of [...(z.uslugi_obce ?? [])].sort((a, b) => a.kolejnosc - b.kolejnosc)) {
     const wartosc = wartoscUslugiObcej(u)
-    wiersze.push([
+    dodaj([
       u.nr_linii_sap ?? z.linia_uslugi ?? null, INDEKS_USLUGI_OBCEJ, u.opis.slice(0, MAKS_KROTKI_TEKST), wartosc, null,
       'JD', 1, wartosc, null, null, null,
     ])
   }
-  return wiersze
+  return linie
+}
+
+/** Przydział braków godzin do pozycji zlecenia (po id stawki z cennika). */
+function przydzielBrakiUslug(uslugi: ZlecenieDoEksportu['pozycje_uslug'], braki: { cennik_pozycja_id: number | null; ilosc_rbg: number }[]) {
+  const opisane = uslugi.map((u) => ({ u, cennik_pozycja_id: u.cennik_pozycje?.id ?? null, ilosc: Number(u.ilosc), mpk_wykonawcy: u.mpk_wykonawcy }))
+  const { naWiersz, nadwyzka } = przydzielBraki(opisane, braki)
+  const naUsluge = new Map<ZlecenieDoEksportu['pozycje_uslug'][number], number>()
+  for (const [o, ile] of naWiersz) naUsluge.set(o.u, ile)
+  return { naWiersz: naUsluge, nadwyzka }
+}
+
+/** Linie do sprzedaży (bez braków) - to, co idzie do SAP i do schowka. */
+export function wierszeSap(z: ZlecenieDoEksportu, materialy: MaterialWgKategorii): WierszSap[] {
+  return liniiSap(z, materialy).filter((l) => !l.brak).map((l) => l.wiersz)
 }
 
 /** Czy zlecenie zawiera pozycje spoza cennika - dział handlowy powinien je sprawdzić. */
@@ -199,26 +237,42 @@ export const KOLUMNY_SZCZEGOLOW = [
   'Cena', 'Wartość', 'Zakup (materiał)', 'Narzut %', 'Narzut [zł]', 'Dokument (PZ/FZ)', 'Dostarczył',
 ] as const
 
+/** Rodzaj wiersza w arkuszu „Szczegóły” dla braków - po nim XLSX koloruje wiersz na czerwono. */
+const PREFIKS_BRAKU = 'Brak'
+
 export function wierszeSzczegolow(z: ZlecenieDoEksportu): (string | number | null)[][] {
   const nr = etykietaZamowienia(z)
   const wynik: (string | number | null)[][] = []
+  const braki = (z.braki_godzin ?? []).map((b) => ({ cennik_pozycja_id: b.cennik_pozycje?.id ?? null, ilosc_rbg: Number(b.ilosc_rbg) }))
+  const { naWiersz, nadwyzka } = przydzielBrakiUslug(z.pozycje_uslug, braki)
   for (const u of z.pozycje_uslug) {
     const c = u.cennik_pozycje
     const rodzaj = !c ? 'Spoza cennika'
       : c.nr_pozycji === GRUPA_ROBOCIZNY ? (u.mpk_wykonawcy ? `Kooperacja ${u.mpk_wykonawcy} (rbg)` : 'Robocizna wg rbg')
       : u.mpk_wykonawcy ? `Usługa wewnętrzna ${u.mpk_wykonawcy}` : 'Robocizna wg cennika'
-    wynik.push([
-      nr, z.nazwa, z.mpk, rodzaj, u.nr_linii_sap ?? z.linia_uslugi ?? null, c?.indeks_sap ?? u.wlasny_indeks ?? '',
-      c?.opis ?? u.wlasny_opis ?? '', Number(u.ilosc), c?.jm ?? u.wlasna_jm ?? '',
-      cenaUslugi(u, Number(u.cena)), wartoscUslugi(u, Number(u.cena)), null,
+    const brak = naWiersz.get(u) ?? 0
+    const wiersz = (rodzajWiersza: string, ilosc: number) => [
+      nr, z.nazwa, z.mpk, rodzajWiersza, u.nr_linii_sap ?? z.linia_uslugi ?? null, c?.indeks_sap ?? u.wlasny_indeks ?? '',
+      c?.opis ?? u.wlasny_opis ?? '', ilosc, c?.jm ?? u.wlasna_jm ?? '',
+      cenaUslugi(u, Number(u.cena)), wartoscUslugi({ ...u, ilosc }, Number(u.cena)), null,
       u.doplata_proc ? u.doplata_proc : null, null, null, null,
-    ])
+    ]
+    if (Number(u.ilosc) - brak > 0 || !brak) wynik.push(wiersz(rodzaj, Number(u.ilosc) - brak))
+    if (brak) wynik.push(wiersz(`${PREFIKS_BRAKU} godzin (nie sprzedane)`, brak))
+  }
+  for (const b of z.braki_godzin ?? []) {
+    const c = b.cennik_pozycje
+    const ile = c ? nadwyzka.get(c.id) : undefined
+    if (!c || !ile) continue
+    nadwyzka.delete(c.id)
+    wynik.push([nr, z.nazwa, z.mpk, `${PREFIKS_BRAKU} godzin (nie sprzedane)`, z.linia_uslugi ?? null, c.indeks_sap, c.opis, ile, c.jm,
+      Number(c.cena), grosze(ile * Number(c.cena)), null, null, null, null, null])
   }
   for (const m of [...z.pozycje_materialowe].sort((a, b) => a.kolejnosc - b.kolejnosc)) {
     const synthos = czySynthos(m.dostawca)
     const zNarzutem = synthos ? 0 : wartoscMaterialu(m)
     wynik.push([
-      nr, z.nazwa, z.mpk, synthos ? 'Materiał Synthos (bez rozliczenia)' : 'Materiał', synthos ? null : z.linia_materialy ?? null,
+      nr, z.nazwa, z.mpk, synthos ? 'Materiał Synthos (bez rozliczenia)' : m.brak ? `${PREFIKS_BRAKU} materiału (nie sprzedany)` : 'Materiał', synthos ? null : z.linia_materialy ?? null,
       synthos ? '' : INDEKS_MATERIALU, m.nazwa, Number(m.ilosc), m.jm ?? '',
       synthos ? 0 : cenaJednMaterialu(m), zNarzutem, synthos ? 0 : m.wartosc_zakupu,
       synthos ? 0 : m.narzut_proc, synthos ? 0 : grosze(zNarzutem - m.wartosc_zakupu), m.numer_faktury ?? '',
@@ -254,31 +308,44 @@ export async function plikXlsx(zlecenia: ZlecenieDoEksportu[], materialy: Materi
     }
   }
   const STYL_BLOKU = { font: { bold: true, sz: 12 }, fill: { fgColor: { rgb: 'DFF3FB' } } }
+  // Braki (godziny / materiał niesprzedany w tym zleceniu) - czerwone, żeby nie trafiły do Fiori przez pomyłkę.
+  const STYL_BRAKU = { font: { bold: true, color: { rgb: 'C00000' } }, fill: { fgColor: { rgb: 'FDE2E2' } } }
+  const wierszeBrakowL: number[] = []
 
   // 1. Linie SAP - wszystko na jednym arkuszu
   const linie: (string | number | null)[][] = []
   const naglowkiBlokow: number[] = []
   const naglowkiKolumn: number[] = []
-  const zestawienie: (string | number)[][] = [['Nr zamówienia', 'Nr AZO', 'Konto', 'MPK', 'Nazwa', 'Dokument', 'Liczba linii', 'Wartość']]
+  const zestawienie: (string | number)[][] = [['Nr zamówienia', 'Nr AZO', 'Konto', 'MPK', 'Nazwa', 'Dokument', 'Liczba linii', 'Wartość', 'Braki']]
   const arkusze: { nazwa: string; ws: Arkusz }[] = []
   const uzyte = new Set<string>(['Linie SAP', 'Szczegóły', 'Zestawienie'])
   let razem = 0
+  let razemBraki = 0
+  const kwota = (x: number) => x.toFixed(2).replace('.', ',')
 
   for (const z of zlecenia) {
-    const wiersze = wierszeSap(z, materialy)
+    const wszystkie = liniiSap(z, materialy)
+    const wiersze = wszystkie.filter((l) => !l.brak).map((l) => l.wiersz)
     const suma = sumaWierszy(wiersze)
+    const sumaBrakow = sumaWierszy(wszystkie.filter((l) => l.brak).map((l) => l.wiersz))
     razem += suma
+    razemBraki += sumaBrakow
     naglowkiBlokow.push(linie.length)
-    linie.push([`Zamówienie ${etykietaZamowienia(z)}  ·  ${z.nazwa}  ·  MPK ${z.mpk}  ·  razem ${suma.toFixed(2).replace('.', ',')} zł`])
+    linie.push([`Zamówienie ${etykietaZamowienia(z)}  ·  ${z.nazwa}  ·  MPK ${z.mpk}  ·  razem ${kwota(suma)} zł`
+      + (sumaBrakow ? `  ·  braki (na czerwono, nie sprzedajemy) ${kwota(sumaBrakow)} zł` : '')])
     naglowkiKolumn.push(linie.length)
     linie.push([...KOLUMNY_SAP])
-    linie.push(...wiersze.map(ukladFiori))
+    for (const l of wszystkie) {
+      if (l.brak) wierszeBrakowL.push(linie.length)
+      linie.push(ukladFiori(l.wiersz))
+    }
     linie.push([])
-    zestawienie.push([etykietaZamowienia(z), z.nr_azo ?? '', z.konto ?? '', z.mpk, z.nazwa, z.dokument ?? '', wiersze.length, suma])
+    zestawienie.push([etykietaZamowienia(z), z.nr_azo ?? '', z.konto ?? '', z.mpk, z.nazwa, z.dokument ?? '', wiersze.length, suma, sumaBrakow || ''])
 
-    const ws = XLSX.utils.aoa_to_sheet([[...KOLUMNY_SAP], ...wiersze.map(ukladFiori)])
+    const ws = XLSX.utils.aoa_to_sheet([[...KOLUMNY_SAP], ...wszystkie.map((l) => ukladFiori(l.wiersz))])
     ws['!cols'] = SZEROKOSCI_SAP.map((wch) => ({ wch }))
     styluj(ws, 0, KOLUMNY_SAP.length, STYL_NAGLOWKA)
+    wszystkie.forEach((l, i) => { if (l.brak) styluj(ws, i + 1, KOLUMNY_SAP.length, STYL_BRAKU) })
     // Nazwa arkusza: max 31 znaków, bez znaków zabronionych, unikalna.
     let nazwa = etykietaZamowienia(z).replace(/[\\/?*[\]:]/g, '_').slice(0, 28)
     let n = 2
@@ -286,12 +353,13 @@ export async function plikXlsx(zlecenia: ZlecenieDoEksportu[], materialy: Materi
     uzyte.add(nazwa)
     arkusze.push({ nazwa, ws })
   }
-  zestawienie.push(['RAZEM', '', '', '', '', '', '', grosze(razem)])
+  zestawienie.push(['RAZEM', '', '', '', '', '', '', grosze(razem), grosze(razemBraki) || ''])
 
   const wsL = XLSX.utils.aoa_to_sheet(linie)
   wsL['!cols'] = SZEROKOSCI_SAP.map((wch) => ({ wch }))
   naglowkiBlokow.forEach((r) => styluj(wsL, r, 1, STYL_BLOKU))
   naglowkiKolumn.forEach((r) => styluj(wsL, r, KOLUMNY_SAP.length, STYL_NAGLOWKA))
+  wierszeBrakowL.forEach((r) => styluj(wsL, r, KOLUMNY_SAP.length, STYL_BRAKU))
   XLSX.utils.book_append_sheet(wb, wsL, 'Linie SAP')
 
   // 2. Szczegóły - całe rozliczenie
@@ -299,13 +367,14 @@ export async function plikXlsx(zlecenia: ZlecenieDoEksportu[], materialy: Materi
   const wsS = XLSX.utils.aoa_to_sheet(szczegoly)
   wsS['!cols'] = [14, 26, 6, 22, 8, 10, 40, 8, 6, 10, 12, 12, 8, 10, 18, 14].map((wch) => ({ wch }))
   styluj(wsS, 0, KOLUMNY_SZCZEGOLOW.length, STYL_NAGLOWKA)
+  szczegoly.forEach((w, i) => { if (i > 0 && String(w[3]).startsWith(PREFIKS_BRAKU)) styluj(wsS, i, KOLUMNY_SZCZEGOLOW.length, STYL_BRAKU) })
   XLSX.utils.book_append_sheet(wb, wsS, 'Szczegóły')
 
   // 3. Zestawienie
   const wsZ = XLSX.utils.aoa_to_sheet(zestawienie)
-  wsZ['!cols'] = [16, 16, 16, 6, 50, 30, 12, 14].map((wch) => ({ wch }))
-  styluj(wsZ, 0, 8, STYL_NAGLOWKA)
-  styluj(wsZ, zestawienie.length - 1, 8, { font: { bold: true } })
+  wsZ['!cols'] = [16, 16, 16, 6, 50, 30, 12, 14, 12].map((wch) => ({ wch }))
+  styluj(wsZ, 0, 9, STYL_NAGLOWKA)
+  styluj(wsZ, zestawienie.length - 1, 9, { font: { bold: true } })
   XLSX.utils.book_append_sheet(wb, wsZ, 'Zestawienie')
 
   // 4. Arkusz na zamówienie

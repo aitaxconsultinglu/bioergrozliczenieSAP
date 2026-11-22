@@ -90,7 +90,9 @@ export function Instrukcja({ profil }: { profil: Profil }) {
           <Krok nr={4} tytul="Robocizna wg rbg (godziny)">
             <p>Wpisz liczbę roboczogodzin w kratce <strong>stanowisko × pora dnia</strong> (7–15, 15–19, 19–7, dni wolne). Stawka bierze się z cennika.</p>
             <p>Godziny przepracowane przez ludzi z innego MPK dodaj w części <strong>„Kooperacja z innym MPK”</strong>. Zastępuje to dopiski typu „20 RBG DLA SPORYSZ”.</p>
-            <p><strong>Brak godzin</strong>: jeśli zleceniodawca założył w zamówieniu za mało godzin, wpisz brakujące rbg w kolumnie „Brak godzin” przy stanowisku. Obok liczy się wartość braku (rbg × stawka), a braki są wyróżnione na czerwono. Dział handlowy będzie pilnował uzupełnienia.</p>
+            <p><strong>Brak godzin</strong>: w siatce wpisz <strong>wszystkie przepracowane godziny</strong>. Jeśli zamawiający założył w zamówieniu mniej, brakującą część wpisz
+              w czerwonym wierszu <strong>„w tym brak”</strong> pod stanowiskiem, w tej samej porze (7-15, 15-19, 19-7, dni wolne). Przykład: 20 rbg przepracowane, zamówienie na 14 - wpisz 20, a w „w tym brak” 6.
+              Do SAP idzie 14, a 6 pokaże się w XLSX jako czerwony wiersz braku. Wartość braku liczy się po stawce tej pory. Dział handlowy pilnuje uzupełnienia w zakładce „Braki godzin”.</p>
             <p><strong>Usługi wewnętrzne</strong> (osobna część pod robocizną): wyważanie, osiowanie lub metrologię wykonane przez inny dział wpisujesz przyciskiem „Dodaj usługę wewnętrzną”.
               Wybierasz MPK wykonawcy (domyślnie P07), usługę z cennika i ilość. Cena jest z umowy, a do SAP pozycja idzie normalnie. Dział handlowy widzi sumę na każde MPK.</p>
           </Krok>
@@ -117,7 +119,8 @@ export function Instrukcja({ profil }: { profil: Profil }) {
             <p>Przycisk <strong>PDF</strong> przy karcie pobiera ją jako plik do załączenia w Synthosie. „PDF wszystkich kart” daje jeden plik z kartami całego zlecenia.</p>
           </Krok>
           <Krok nr={7} tytul="Braki godzin">
-            <p>Brakujące godziny wpisujesz w kolumnie „Brak godzin [rbg]” w siatce robocizny (krok 4). Osobnej części już nie ma.</p>
+            <p>Brakujące godziny wpisujesz w czerwonym wierszu „w tym brak” pod stanowiskiem w siatce robocizny (krok 4), przy właściwej porze dnia.
+              Brak materiału zaznaczasz w tabeli materiałów w kolumnie <strong>„Brak”</strong> (krok 5). Braki nie wchodzą do wartości zlecenia, a w XLSX są na czerwono.</p>
           </Krok>
           <Krok nr={8} tytul="Zapisz i złóż">
             <p><strong>Zapisz</strong> możesz klikać w każdej chwili, nawet z niepełnymi danymi, bo to wersja robocza.
