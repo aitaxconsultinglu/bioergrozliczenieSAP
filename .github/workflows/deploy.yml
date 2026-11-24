@@ -9,16 +9,17 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: "pages"
   cancel-in-progress: true
 
+# Budowanie i publikacja są w osobnych zadaniach: deploy-pages uruchomione zaraz po
+# upload-pages-artifact w tym samym zadaniu potrafi nie zobaczyć jeszcze artefaktu
+# („No artifacts named github-pages”, listopad 2026).
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Pobranie repozytorium
@@ -50,6 +51,13 @@ jobs:
         with:
           path: 'dist'
 
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
       - name: Publikacja
         id: deployment
         uses: actions/deploy-pages@v4
