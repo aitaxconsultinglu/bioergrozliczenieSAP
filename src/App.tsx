@@ -6,7 +6,7 @@ import type { Profil } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Logowanie } from './components/Logowanie'
 import { UstawHaslo } from './components/UstawHaslo'
-import { ListaZlecen } from './components/ListaZlecen'
+import { ListaZlecen, wyczyscZapamietaneFiltry } from './components/ListaZlecen'
 import { EdytorZlecenia } from './components/EdytorZlecenia'
 import { PanelEksportu } from './components/PanelEksportu'
 import { BrakiGodzin } from './components/BrakiGodzin'
@@ -43,6 +43,8 @@ export default function App() {
     const { data: sub } = supabase.auth.onAuthStateChange((zdarzenie, s) => {
       if (zdarzenie === 'PASSWORD_RECOVERY') setOdzyskiwanie(true)
       setSesja(s)
+      // Wylogowanie (także po wygaśnięciu sesji) kasuje zapamiętane filtry listy zleceń.
+      if (zdarzenie === 'SIGNED_OUT') wyczyscZapamietaneFiltry()
       if (!s) {
         setProfil(null)
         setOdzyskiwanie(false)

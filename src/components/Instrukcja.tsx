@@ -161,7 +161,7 @@ export function Instrukcja({ profil }: { profil: Profil }) {
                 Na liście zleceń są kolumny Nr AZO i Konto: wyszukasz po nich zrealizowane zamówienia i posortujesz listę.</p>
             </Krok>
             <Krok nr="3b" tytul="Filtry i kosz">
-              <p>Na liście zleceń przy każdym nagłówku jest ikonka lejka: wybierasz wartości z kolumny (np. konto, MPK, status, miesiąc zmiany), jak w Excelu.
+              <p>Na liście zleceń przy każdym nagłówku jest ikonka lejka: wybierasz wartości z kolumny (np. konto, MPK, status, miesiąc zmiany), jak w Excelu. Ustawione filtry (status, MPK, wyszukiwanie, lejki, okres) zostają po wejściu w zlecenie i powrocie na listę - kasuje je wylogowanie albo „Wyczyść wszystkie filtry”.
                 Pod tabelą jest <strong>suma wartości</strong>: po zawężeniu filtrami (wyszukiwarka, status, MPK, lejki) pokazuje sumę widocznych zleceń, a pod nią sumę wszystkich.
                 <strong>„Anuluj zlecenie”</strong> oznacza zlecenie jako odwołane: zostaje w historii, jest zablokowane i nie liczy się do sum (cofniesz to przez „Zmień status”).
                 Dział handlowy może też <strong>usunąć całe zlecenie w każdym statusie</strong> (przycisk „Usuń” u góry zlecenia).

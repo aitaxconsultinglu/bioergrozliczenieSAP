@@ -43,6 +43,7 @@ interface Sortowanie { kolumna: Kolumna; rosnaco: boolean }
 
 const KLUCZ_SORTOWANIA = 'rozliczenia.lista.sortowanie'
 const KLUCZ_OKRESU = 'rozliczenia.lista.okres'
+const KLUCZ_FILTROW = 'rozliczenia.lista.filtry'
 const DOMYSLNE: Sortowanie = { kolumna: 'zmieniono', rosnaco: false }
 /** Filtr „otwarte” = wszystko oprócz zakończonych - to, czym trzeba się jeszcze zająć. */
 const OTWARTE = '__otwarte'
@@ -68,6 +69,35 @@ function wczytajOkres(): WyborOkresu {
   } catch {
     return WSZYSTKO
   }
+}
+
+/** Filtry listy (pasek + kolumny) - pamiętane po wejściu w zlecenie i powrocie, do wylogowania. */
+interface ZapisFiltrow {
+  status: string
+  mpk: string
+  szukaj: string
+  filtry: Record<string, string[]>
+}
+
+function wczytajFiltry(): ZapisFiltrow {
+  const puste: ZapisFiltrow = { status: '', mpk: '', szukaj: '', filtry: {} }
+  try {
+    const z = JSON.parse(localStorage.getItem(KLUCZ_FILTROW) ?? '') as Partial<ZapisFiltrow>
+    const status = z.status === OTWARTE || (z.status && z.status in ETYKIETY_STATUSU) ? z.status : ''
+    const filtry: Record<string, string[]> = {}
+    for (const [k, v] of Object.entries(z.filtry ?? {})) if (Array.isArray(v)) filtry[k] = v.map(String)
+    return { status, mpk: typeof z.mpk === 'string' ? z.mpk : '', szukaj: typeof z.szukaj === 'string' ? z.szukaj : '', filtry }
+  } catch {
+    return puste
+  }
+}
+
+/** Czyści zapamiętane filtry i okres listy zleceń - wywoływane przy wylogowaniu. */
+export function wyczyscZapamietaneFiltry() {
+  try {
+    localStorage.removeItem(KLUCZ_FILTROW)
+    localStorage.removeItem(KLUCZ_OKRESU)
+  } catch { /* brak pamięci przeglądarki - nie ma czego czyścić */ }
 }
 
 const tekst = (a: string | null, b: string | null) => (a ?? '').localeCompare(b ?? '', 'pl', { numeric: true, sensitivity: 'base' })
@@ -115,11 +145,15 @@ export function ListaZlecen({ profil, otworz }: Props) {
   const [ladowanie, setLadowanie] = useState(true)
   const [blad, setBlad] = useState<string | null>(null)
   const [komunikat, setKomunikat] = useState<string | null>(null)
-  const [status, setStatus] = useState<StatusZlecenia | '' | typeof OTWARTE>('')
-  const [mpk, setMpk] = useState('')
-  const [szukaj, setSzukaj] = useState('')
+  // Filtry wracają po wejściu w zlecenie i powrocie na listę (komponent jest wtedy montowany od nowa).
+  const [zapisane] = useState(wczytajFiltry)
+  const [status, setStatus] = useState<StatusZlecenia | '' | typeof OTWARTE>(zapisane.status as StatusZlecenia | '' | typeof OTWARTE)
+  const [mpk, setMpk] = useState(zapisane.mpk)
+  const [szukaj, setSzukaj] = useState(zapisane.szukaj)
   const [sortowanie, setSortowanie] = useState<Sortowanie>(wczytajSortowanie)
-  const [filtry, setFiltry] = useState<Partial<Record<KolumnaFiltra, Set<string>>>>({})
+  const [filtry, setFiltry] = useState<Partial<Record<KolumnaFiltra, Set<string>>>>(
+    () => Object.fromEntries(Object.entries(zapisane.filtry).map(([k, v]) => [k, new Set(v)])),
+  )
   const [okres, setOkres] = useState<WyborOkresu>(wczytajOkres)
   const [zaznaczone, setZaznaczone] = useState<Set<string>>(new Set())
   const [potwierdzZakonczenie, setPotwierdzZakonczenie] = useState(false)
@@ -204,6 +238,24 @@ export function ListaZlecen({ profil, otworz }: Props) {
   )
 
   const ileFiltrow = Object.keys(filtry).length
+  const saFiltry = ileFiltrow > 0 || !!status || !!mpk || !!szukaj.trim()
+
+  useEffect(() => {
+    try {
+      // Po odznaczeniu wszystkich filtrów nic nie zostaje w pamięci przeglądarki.
+      if (!saFiltry) localStorage.removeItem(KLUCZ_FILTROW)
+      else localStorage.setItem(KLUCZ_FILTROW, JSON.stringify({
+        status, mpk, szukaj, filtry: Object.fromEntries(Object.entries(filtry).map(([k, v]) => [k, [...(v ?? [])]])),
+      } satisfies ZapisFiltrow))
+    } catch { /* brak pamięci przeglądarki - filtry działają bez zapamiętania */ }
+  }, [status, mpk, szukaj, filtry, saFiltry])
+
+  function wyczyscFiltry() {
+    setStatus('')
+    setMpk('')
+    setSzukaj('')
+    setFiltry({})
+  }
   const ustawFiltr = (k: KolumnaFiltra, w: Set<string> | null) =>
     setFiltry((f) => { const n = { ...f }; if (w === null) delete n[k]; else n[k] = w; return n })
 
@@ -294,10 +346,14 @@ export function ListaZlecen({ profil, otworz }: Props) {
 
       <NawigatorOkresow drzewo={drzewo} wybor={okres} zmien={zmienOkres} ileWidocznych={widoczne.length} />
 
-      {ileFiltrow > 0 && (
+      {saFiltry && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-slate-600">Filtry kolumn: <strong>{ileFiltrow}</strong> · pokazano {widoczne.length} z {wiersze.length} zleceń</span>
-          <button className="text-blekit-ciemny underline" onClick={() => setFiltry({})}>Wyczyść filtry kolumn</button>
+          <span className="text-slate-600">
+            Filtry są zapamiętane do wylogowania
+            {ileFiltrow > 0 && <> · filtry kolumn: <strong>{ileFiltrow}</strong></>} · pokazano {widoczne.length} z {wiersze.length} zleceń
+          </span>
+          {ileFiltrow > 0 && <button className="text-blekit-ciemny underline" onClick={() => setFiltry({})}>Wyczyść filtry kolumn</button>}
+          <button className="text-blekit-ciemny underline" onClick={wyczyscFiltry}>Wyczyść wszystkie filtry</button>
         </div>
       )}
       {blad && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{blad}</p>}
