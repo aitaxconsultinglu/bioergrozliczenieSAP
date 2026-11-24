@@ -74,10 +74,17 @@ export function SiatkaRobocizny({ uslugi, ustaw, mpkZlecenia, edycja, braki, ust
     }
   }
   const brakiBezStanowiska = braki.filter((b) => b.cennik_pozycja_id === null || !idStawek.has(b.cennik_pozycja_id))
-  const sumaBrakow = braki.reduce((s, b) => s + b.ilosc_rbg, 0)
-  /** Wartość braku = rbg × stawka komórki, w której brak jest wpisany. */
-  const wartoscBraku = (b: BrakGodzin) => b.ilosc_rbg * (stawki.find((s) => s.cennik_pozycja_id === b.cennik_pozycja_id)?.cena ?? 0)
-  const wartoscBrakow = grosze(braki.reduce((s, b) => s + wartoscBraku(b), 0))
+  /**
+   * Cena braku w komórce = stawka tej komórki (stanowisko x pora): zapisana przy godzinach
+   * (cena z chwili wpisu), a gdy godzin brak - bieżąca z cennika. Tak samo liczy eksport.
+   */
+  const cenaBrakuStawki = (st: Stawka) => wlasne.find((u) => u.cennik_pozycja_id === st.cennik_pozycja_id)?.cena ?? st.cena
+  /** Braki rozbite na stawki - każda pora ma inną cenę, więc rbg z różnych stawek nie sumujemy w jedną liczbę. */
+  const brakiWgStawek = stawki
+    .map((st) => ({ st, rbg: sumaBrakuStawki(st) }))
+    .filter((x) => x.rbg > 0)
+    .map((x) => ({ ...x, cena: cenaBrakuStawki(x.st), wartosc: grosze(x.rbg * cenaBrakuStawki(x.st)) }))
+  const wartoscBrakow = grosze(brakiWgStawek.reduce((s, x) => s + x.wartosc, 0))
 
   function cenaWiersza(u: PozycjaUslugi) {
     return u.cena ?? stawki.find((s) => s.cennik_pozycja_id === u.cennik_pozycja_id)?.cena ?? 0
@@ -113,6 +120,9 @@ export function SiatkaRobocizny({ uslugi, ustaw, mpkZlecenia, edycja, braki, ust
         <PoleLiczby aria-label={`${nazwa} ${etykieta} - brak godzin`} wartosc={suma} disabled={!edytowalny}
           zmien={(n) => ustawBrak(st, n)} placeholder="0"
           className={cn(suma > 0 && 'font-semibold text-red-700', zaDuzo && 'ring-1 ring-red-500', className)} />
+        <span className={cn('whitespace-nowrap pr-2 text-[10px]', suma > 0 ? 'font-medium text-red-700' : 'text-slate-400')}>
+          × {zl(cenaBrakuStawki(st))}{suma > 0 && <> = {zl(grosze(suma * cenaBrakuStawki(st)))}</>}
+        </span>
         {status && <span className="whitespace-nowrap pr-2 text-[10px] text-slate-500">{ETYKIETY_BRAKU[status].toLowerCase()}</span>}
       </div>
     )
@@ -139,7 +149,7 @@ export function SiatkaRobocizny({ uslugi, ustaw, mpkZlecenia, edycja, braki, ust
               const stawkiWiersza = [...pory.values()]
               const wartosc = stawkiWiersza.reduce((s, st) => s + wartoscSprzedanaStawki(st), 0)
               const brakWiersza = stawkiWiersza.reduce((s, st) => s + sumaBrakuStawki(st), 0)
-              const wartoscBrakuWiersza = grosze(stawkiWiersza.reduce((s, st) => s + sumaBrakuStawki(st) * st.cena, 0))
+              const wartoscBrakuWiersza = grosze(stawkiWiersza.reduce((s, st) => s + grosze(sumaBrakuStawki(st) * cenaBrakuStawki(st)), 0))
               // Wiersz braków tylko tam, gdzie są godziny albo już wpisany brak - siatka zostaje czytelna.
               const pokazBraki = brakWiersza > 0 || stawkiWiersza.some((st) => godzinyStawki(st) > 0)
               const stala = pory.get('stala')
@@ -278,10 +288,29 @@ export function SiatkaRobocizny({ uslugi, ustaw, mpkZlecenia, edycja, braki, ust
       )}
       <p className="text-right text-sm text-slate-600">
         Własne: <strong>{sumaGodzin.toLocaleString('pl-PL')} rbg</strong> · Robocizna razem: <strong>{zl(sumaWartosci)} zł</strong>
-        {sumaBrakow > 0 && (
-          <span className="text-red-700"> · Braki godzin: <strong>{sumaBrakow.toLocaleString('pl-PL')} rbg = {zl(wartoscBrakow)} zł</strong></span>
-        )}
       </p>
+      {brakiWgStawek.length > 0 && (
+        <div className="ml-auto w-fit rounded-md bg-red-50 px-3 py-2 text-sm text-red-800 ring-1 ring-red-200">
+          <p className="mb-1 font-semibold">Braki godzin wg stawek</p>
+          <table className="text-right tabular-nums">
+            <tbody>
+              {brakiWgStawek.map(({ st, rbg, cena, wartosc }) => (
+                <tr key={st.cennik_pozycja_id}>
+                  <td className="pr-4 text-left">{st.stanowisko} · {st.pora === 'stala' ? 'stawka stała' : ETYKIETY_PORY[st.pora]}</td>
+                  <td className="pr-2">{rbg.toLocaleString('pl-PL')} rbg</td>
+                  <td className="pr-2">× {zl(cena)}</td>
+                  <td>= {zl(wartosc)} zł</td>
+                </tr>
+              ))}
+              <tr className="border-t border-red-200 font-semibold">
+                <td className="pr-4 pt-1 text-left">Razem braki</td>
+                <td colSpan={2} />
+                <td className="pt-1">{zl(wartoscBrakow)} zł</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
