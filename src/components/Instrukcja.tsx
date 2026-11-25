@@ -120,7 +120,7 @@ export function Instrukcja({ profil }: { profil: Profil }) {
           </Krok>
           <Krok nr={7} tytul="Braki godzin">
             <p>Brakujące godziny wpisujesz w czerwonym wierszu „w tym brak” pod stanowiskiem w siatce robocizny (krok 4), przy właściwej porze dnia.
-              Brak materiału zaznaczasz w tabeli materiałów w kolumnie <strong>„Brak”</strong> (krok 5). Braki nie wchodzą do wartości zlecenia, a w XLSX są na czerwono.</p>
+              Brak materiału wpisujesz w tabeli materiałów w kolumnie <strong>„Brak [ilość]”</strong> (krok 5) - ile sztuk z pozycji nie sprzedajemy, np. 1 z 3 wirników; wartość dzieli się proporcjonalnie. Braki nie wchodzą do wartości zlecenia, a w XLSX są na czerwono.</p>
           </Krok>
           <Krok nr={8} tytul="Zapisz i złóż">
             <p><strong>Zapisz</strong> możesz klikać w każdej chwili, nawet z niepełnymi danymi, bo to wersja robocza.

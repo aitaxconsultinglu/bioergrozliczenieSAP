@@ -173,7 +173,7 @@ describe('braki godzin i materiału (uwagi działu handlowego 2026-11-21)', () =
       { ilosc: 16, cena: 100, doplata_proc: 0, kolejnosc: 3, cennik_pozycje: wolne },
     ],
     pozycje_materialowe: [
-      { nazwa: 'ŁOŻYSKO KULKOWE 3306', ilosc: 1, wartosc_zakupu: 240.4, narzut_proc: 12, dostawca: 'bioerg', kolejnosc: 0, brak: true },
+      { nazwa: 'ŁOŻYSKO KULKOWE 3306', ilosc: 1, wartosc_zakupu: 240.4, narzut_proc: 12, dostawca: 'bioerg', kolejnosc: 0, brak_ilosc: 1 },
       { nazwa: 'ZMYWACZ', ilosc: 1, wartosc_zakupu: 12.98, narzut_proc: 12, dostawca: 'bioerg', kolejnosc: 1 },
     ],
     braki_godzin: [
@@ -221,5 +221,23 @@ describe('braki godzin i materiału (uwagi działu handlowego 2026-11-21)', () =
     const wiersze = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 })
     expect(wiersze.length).toBe(8)
     expect(wierszeSzczegolow(z).filter((w) => String(w[3]).startsWith('Brak')).length).toBe(4)
+  })
+})
+
+describe('brak części ilości materiału', () => {
+  it('wirnik 3 szt., brak 1 szt.: 2 szt. sprzedane, 1 szt. na czerwono, wartość dzielona proporcjonalnie', () => {
+    const z: ZlecenieDoEksportu = {
+      id: 'w', mpk: 'P04', nr_zamowienia: '4200113890', pozycja_zamowienia: null, nazwa: 'POMPA', linia_materialy: 20,
+      pozycje_uslug: [],
+      pozycje_materialowe: [{ nazwa: 'WIRNIK SK4 35.4.304.100', ilosc: 3, wartosc_zakupu: 1603.5, narzut_proc: 12, dostawca: 'bioerg', kolejnosc: 0, brak_ilosc: 1 }],
+    }
+    const linie = liniiSap(z, new Map()).map((l) => [l.wiersz[3], l.wiersz[8], l.wiersz[9], l.brak])
+    expect(linie).toEqual([[1197.28, 598.64, 2, false], [598.64, 598.64, 1, true]])
+    const szczegoly = wierszeSzczegolow(z)
+    expect(szczegoly.map((w) => [w[3], w[7], w[10], w[11]])).toEqual([
+      ['Materiał', 2, 1197.28, 1069], ['Brak materiału (nie sprzedany)', 1, 598.64, 534.5],
+    ])
+    const s = policzSumy([], z.pozycje_materialowe, new Map())
+    expect([s.materialy, s.braki]).toEqual([1197.28, 598.64])
   })
 })

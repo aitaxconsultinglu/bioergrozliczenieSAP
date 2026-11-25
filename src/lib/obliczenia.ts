@@ -34,6 +34,27 @@ export function cenaJednMaterialu(m: Pick<PozycjaMaterialowa, 'wartosc_zakupu' |
   return grosze(wartoscMaterialu(m) / m.ilosc)
 }
 
+/**
+ * Podział materiału na część sprzedaną i brak (np. wirnik 3 szt., zamawiający założył 2 -> brak 1 szt.).
+ * Wartość z narzutem i zakup dzielone proporcjonalnie do ilości; sprzedane = całość minus brak,
+ * żeby suma obu części zawsze dawała wartość wiersza co do grosza.
+ */
+export function podzialMaterialu(m: Pick<PozycjaMaterialowa, 'wartosc_zakupu' | 'narzut_proc' | 'ilosc' | 'brak_ilosc'>) {
+  const wartosc = wartoscMaterialu(m)
+  const ilosc = Number(m.ilosc) || 0
+  const brakIlosc = Math.min(Math.max(Number(m.brak_ilosc) || 0, 0), ilosc)
+  if (!brakIlosc) {
+    return { sprzedane: { ilosc, wartosc, zakup: m.wartosc_zakupu }, brak: { ilosc: 0, wartosc: 0, zakup: 0 } }
+  }
+  const czesc = brakIlosc / ilosc
+  const wartoscBraku = brakIlosc >= ilosc ? wartosc : grosze(wartosc * czesc)
+  const zakupBraku = brakIlosc >= ilosc ? m.wartosc_zakupu : grosze(m.wartosc_zakupu * czesc)
+  return {
+    sprzedane: { ilosc: ilosc - brakIlosc, wartosc: grosze(wartosc - wartoscBraku), zakup: grosze(m.wartosc_zakupu - zakupBraku) },
+    brak: { ilosc: brakIlosc, wartosc: wartoscBraku, zakup: zakupBraku },
+  }
+}
+
 /** Materiał Synthos rozpoznajemy po nazwie dostawcy - tak samo jak funkcja czy_synthos() w bazie. */
 export function czySynthos(dostawca: string | null | undefined) {
   return /synthos/i.test(dostawca ?? '')
@@ -91,7 +112,7 @@ export function przydzielBraki<T extends { cennik_pozycja_id: number | null; ilo
 
 export function policzSumy(
   uslugi: (Pick<PozycjaUslugi, 'cennik_pozycja_id' | 'ilosc' | 'doplata_proc' | 'cena' | 'wlasna_cena'> & { mpk_wykonawcy?: string | null })[],
-  materialy: Pick<PozycjaMaterialowa, 'wartosc_zakupu' | 'narzut_proc' | 'dostawca' | 'brak'>[],
+  materialy: Pick<PozycjaMaterialowa, 'wartosc_zakupu' | 'narzut_proc' | 'dostawca' | 'ilosc' | 'brak_ilosc'>[],
   cennik: Map<number, PozycjaCennika>,
   uslugiObce: Pick<UslugaObca, 'wartosc_zakupu' | 'narzut_proc'>[] = [],
   brakiGodzin: BrakGodzinDoRozliczenia[] = [],
@@ -122,8 +143,8 @@ export function policzSumy(
     else pozycjeCennikowe += w
   }
   const doRozliczenia = materialy.filter((m) => !czySynthos(m.dostawca))
-  const mat = doRozliczenia.filter((m) => !m.brak).reduce((s, m) => s + wartoscMaterialu(m), 0)
-  braki += doRozliczenia.filter((m) => m.brak).reduce((s, m) => s + wartoscMaterialu(m), 0)
+  const mat = doRozliczenia.reduce((s, m) => s + podzialMaterialu(m).sprzedane.wartosc, 0)
+  braki += doRozliczenia.reduce((s, m) => s + podzialMaterialu(m).brak.wartosc, 0)
   const obce = uslugiObce.reduce((s, u) => s + wartoscUslugiObcej(u), 0)
   return {
     robocizna: grosze(robocizna),

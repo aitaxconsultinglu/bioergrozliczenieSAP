@@ -29,7 +29,7 @@ interface Wiersz {
   zmodyfikowano: string
   komentarz_handlowca: string | null
   pozycje_uslug: { ilosc: number; cena: number; doplata_proc: number; cennik_pozycja_id: number | null; mpk_wykonawcy: string | null }[]
-  pozycje_materialowe: { wartosc_zakupu: number; narzut_proc: number; dostawca: Dostawca; brak: boolean }[]
+  pozycje_materialowe: { wartosc_zakupu: number; narzut_proc: number; dostawca: Dostawca; ilosc: number; brak_ilosc: number }[]
   uslugi_obce: { wartosc_zakupu: number; narzut_proc: number }[]
   /** Braki godzin - wartość zlecenia na liście to sprzedaż bez braków. */
   braki_godzin: { cennik_pozycja_id: number | null; ilosc_rbg: number }[]
@@ -167,7 +167,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
       .select(`id, mpk, nr_zamowienia, pozycja_zamowienia, nazwa, mechanik, konto, nr_azo, dokument, status, zmodyfikowano, komentarz_handlowca,
                pozycje_uslug(ilosc, cena, doplata_proc, cennik_pozycja_id, mpk_wykonawcy),
                braki_godzin(cennik_pozycja_id, ilosc_rbg),
-               pozycje_materialowe(wartosc_zakupu, narzut_proc, dostawca, brak),
+               pozycje_materialowe(wartosc_zakupu, narzut_proc, dostawca, ilosc, brak_ilosc),
                uslugi_obce(wartosc_zakupu, narzut_proc)`)
       .order('zmodyfikowano', { ascending: false })
       .limit(2000)
@@ -181,7 +181,7 @@ export function ListaZlecen({ profil, otworz }: Props) {
       okres: okresZAzo(w.nr_azo),
       wartosc: policzSumy(
         w.pozycje_uslug.map((u) => ({ ...u, cena: Number(u.cena), ilosc: Number(u.ilosc), doplata_proc: Number(u.doplata_proc) })),
-        w.pozycje_materialowe.map((m) => ({ ...m, wartosc_zakupu: Number(m.wartosc_zakupu), narzut_proc: Number(m.narzut_proc) })),
+        w.pozycje_materialowe.map((m) => ({ ...m, wartosc_zakupu: Number(m.wartosc_zakupu), narzut_proc: Number(m.narzut_proc), ilosc: Number(m.ilosc), brak_ilosc: Number(m.brak_ilosc ?? 0) })),
         cennik,
         (w.uslugi_obce ?? []).map((u) => ({ wartosc_zakupu: Number(u.wartosc_zakupu), narzut_proc: Number(u.narzut_proc) })),
         (w.braki_godzin ?? []).map((b) => ({ cennik_pozycja_id: b.cennik_pozycja_id, ilosc_rbg: Number(b.ilosc_rbg) })),

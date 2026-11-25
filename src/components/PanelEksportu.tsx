@@ -16,7 +16,7 @@ const ZAPYTANIE = `id, mpk, nr_zamowienia, pozycja_zamowienia, nazwa, mechanik, 
   uslugi_obce(id, opis, wykonawca, numer_faktury, wartosc_zakupu, narzut_proc, nr_linii_sap, kolejnosc),
   zalaczniki(typ, usluga_obca_id),
   pozycje_uslug(ilosc, cena, doplata_proc, kolejnosc, mpk_wykonawcy, wlasny_opis, wlasna_jm, wlasny_indeks, nr_linii_sap, cennik_pozycje(*)),
-  pozycje_materialowe(nazwa, ilosc, jm, wartosc_zakupu, narzut_proc, dostawca, kolejnosc, numer_faktury, brak),
+  pozycje_materialowe(nazwa, ilosc, jm, wartosc_zakupu, narzut_proc, dostawca, kolejnosc, numer_faktury, brak_ilosc),
   braki_godzin(ilosc_rbg, cennik_pozycje(*))`
 
 type ZlecenieZPanelu = ZlecenieDoEksportu & { mechanik: string | null; zlozono: string | null; bezSkanu: number }
@@ -37,7 +37,7 @@ function normalizuj(z: any): ZlecenieZPanelu {
       cennik_pozycje: u.cennik_pozycje ? { ...u.cennik_pozycje, cena: Number(u.cennik_pozycje.cena) } : null,
     })),
     pozycje_materialowe: z.pozycje_materialowe.map((m: any) => ({
-      ...m, ilosc: Number(m.ilosc), wartosc_zakupu: Number(m.wartosc_zakupu), narzut_proc: Number(m.narzut_proc),
+      ...m, ilosc: Number(m.ilosc), wartosc_zakupu: Number(m.wartosc_zakupu), narzut_proc: Number(m.narzut_proc), brak_ilosc: Number(m.brak_ilosc ?? 0),
     })),
     uslugi_obce: (z.uslugi_obce ?? []).map((u: any) => ({ ...u, wartosc_zakupu: Number(u.wartosc_zakupu), narzut_proc: Number(u.narzut_proc) })),
     braki_godzin: (z.braki_godzin ?? []).map((b: any) => ({

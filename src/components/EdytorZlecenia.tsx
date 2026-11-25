@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useSlowniki } from '@/lib/slowniki'
 import { komunikatPL } from '@/lib/config'
 import { ETYKIETY_STATUSU, KOLORY_STATUSU, dataGodzinaPL, zl } from '@/lib/format'
-import { czySynthos, grosze, nowyKlucz, policzSumy, wartoscMaterialu } from '@/lib/obliczenia'
+import { czySynthos, grosze, nowyKlucz, podzialMaterialu, policzSumy } from '@/lib/obliczenia'
 import { SZABLONY, brakiKarty, parametrySilnika, szablon } from '@/lib/szablony'
 import { KOLUMNY_KWOT, KOLUMNY_SAP, ukladFiori, etykietaZamowienia, liniiSap, plikXlsx, pobierz, tekstDoSchowka, type ZlecenieDoEksportu } from '@/lib/eksportSap'
 import type {
@@ -86,7 +86,7 @@ function zBazy(z: any): Stan {
     })),
     materialy: [...(z.pozycje_materialowe ?? [])].sort((a: any, b: any) => a.kolejnosc - b.kolejnosc || a.id - b.id).map((m: any) => ({
       id: m.id, klucz: `m${m.id}`, nazwa: m.nazwa, ilosc: Number(m.ilosc), jm: m.jm, wartosc_zakupu: Number(m.wartosc_zakupu),
-      dostawca: m.dostawca, narzut_proc: Number(m.narzut_proc), numer_faktury: m.numer_faktury, brak: !!m.brak,
+      dostawca: m.dostawca, narzut_proc: Number(m.narzut_proc), numer_faktury: m.numer_faktury, brak_ilosc: Number(m.brak_ilosc ?? 0),
     })),
     karty: [...(z.karty_remontowe ?? [])].sort((a: any, b: any) => a.utworzono.localeCompare(b.utworzono)).map((k: any) => ({
       id: k.id, klucz: `k${k.id}`, numer_karty: k.numer_karty ?? '', szablon: k.szablon, urzadzenie_nazwa: k.urzadzenie_nazwa ?? '',
@@ -175,7 +175,7 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
       const nowy: Stan = {
         naglowek: { ...s.naglowek, nr_zamowienia: '', pozycja_zamowienia: '', linia_uslugi: '', linia_materialy: '', data_przyjecia: '', data_zakonczenia: '', uwagi: '', dokument: '' },
         uslugi: s.uslugi.map((u) => ({ ...u, id: undefined, cena: undefined, nr_linii_sap: null, klucz: nowyKlucz() })),
-        materialy: s.materialy.map((m) => ({ ...m, id: undefined, brak: false, klucz: nowyKlucz() })),
+        materialy: s.materialy.map((m) => ({ ...m, id: undefined, brak_ilosc: 0, klucz: nowyKlucz() })),
         karty: [], braki: [], uslugiObce: [],
       }
       setStan(nowy)
@@ -685,10 +685,10 @@ export function EdytorZlecenia({ zlecenieId, profil, zamknij, otworzInne }: Prop
             </tbody>
           </table>
           {(() => {
-            const mat = bezPustychMaterialow(materialy).filter((m) => !czySynthos(m.dostawca) && !m.brak)
-            if (!mat.length) return null
-            const zakup = grosze(mat.reduce((s, m) => s + m.wartosc_zakupu, 0))
-            const razem = grosze(mat.reduce((s, m) => s + wartoscMaterialu(m), 0))
+            const mat = bezPustychMaterialow(materialy).filter((m) => !czySynthos(m.dostawca)).map((m) => podzialMaterialu(m).sprzedane)
+            if (!mat.some((m) => m.ilosc > 0)) return null
+            const zakup = grosze(mat.reduce((s, m) => s + m.zakup, 0))
+            const razem = grosze(mat.reduce((s, m) => s + m.wartosc, 0))
             return (
               <p className="mt-2 rounded bg-slate-50 px-3 py-2 text-xs text-slate-600">
                 Materiał: zakup <strong>{zl(zakup)} zł</strong> + narzut <strong>{zl(grosze(razem - zakup))} zł</strong> = <strong>{zl(razem)} zł</strong>.

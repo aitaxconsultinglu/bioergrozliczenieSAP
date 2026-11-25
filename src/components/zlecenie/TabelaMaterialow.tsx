@@ -4,8 +4,9 @@ import { History, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useSlowniki } from '@/lib/slowniki'
 import { dataPL, zl } from '@/lib/format'
-import { cenaJednMaterialu, czySynthos, grosze, nowyKlucz, wartoscMaterialu } from '@/lib/obliczenia'
+import { cenaJednMaterialu, czySynthos, grosze, nowyKlucz, podzialMaterialu, wartoscMaterialu } from '@/lib/obliczenia'
 import type { PozycjaMaterialowa } from '@/lib/types'
+import { cn } from '@/lib/utils'
 import { PoleLiczby } from '../PoleLiczby'
 import { PoleWyboru } from '../PoleWyboru'
 
@@ -73,11 +74,12 @@ export function TabelaMaterialow({ materialy, ustaw, edycja }: Props) {
   }
 
   // Braki (materiał niesprzedany w tym zleceniu) nie wchodzą do sumy sprzedaży - pokazane osobno.
-  const doRozliczenia = materialy.filter((m) => !czySynthos(m.dostawca) && !m.brak)
-  const sumaZakupu = grosze(doRozliczenia.reduce((s, m) => s + m.wartosc_zakupu, 0))
-  const sumaRazem = grosze(doRozliczenia.reduce((s, m) => s + wartoscMaterialu(m), 0))
-  const braki = materialy.filter((m) => !czySynthos(m.dostawca) && m.brak)
-  const sumaBrakow = grosze(braki.reduce((s, m) => s + wartoscMaterialu(m), 0))
+  // Brak może dotyczyć części ilości (np. 1 z 3 szt.) - sumy liczone z podziału proporcjonalnego.
+  const doRozliczenia = materialy.filter((m) => !czySynthos(m.dostawca)).map((m) => podzialMaterialu(m))
+  const sumaZakupu = grosze(doRozliczenia.reduce((s, p) => s + p.sprzedane.zakup, 0))
+  const sumaRazem = grosze(doRozliczenia.reduce((s, p) => s + p.sprzedane.wartosc, 0))
+  const braki = doRozliczenia.filter((p) => p.brak.ilosc > 0)
+  const sumaBrakow = grosze(braki.reduce((s, p) => s + p.brak.wartosc, 0))
 
   return (
     <div className="space-y-2">
@@ -95,8 +97,8 @@ export function TabelaMaterialow({ materialy, ustaw, edycja }: Props) {
               <th className="komorka-naglowek w-24 text-right">Narzut [zł]</th>
               <th className="komorka-naglowek w-28 text-right">Wartość z narzutem</th>
               <th className="komorka-naglowek w-32" title="Dokument źródłowy zakupu z Optimy (PZ / FZ) albo numer faktury">Dokument (PZ/FZ)</th>
-              <th className="komorka-naglowek w-14 text-center"
-                title="Brak: materiał zużyty, ale zamawiający nie założył go w zamówieniu - nie sprzedajemy go w tym zleceniu (w XLSX na czerwono)">Brak</th>
+              <th className="komorka-naglowek w-20 text-right"
+                title="Brak: ile z tej ilości zamawiający nie założył w zamówieniu - nie sprzedajemy tego w tym zleceniu (w XLSX na czerwono)">Brak [ilość]</th>
               <th className="komorka-naglowek w-10" />
             </tr>
           </thead>
@@ -104,8 +106,12 @@ export function TabelaMaterialow({ materialy, ustaw, edycja }: Props) {
             {materialy.map((m, i) => {
               const synthos = czySynthos(m.dostawca)
               const zNarzutem = wartoscMaterialu(m)
+              const podzial = podzialMaterialu(m)
+              const brakIlosc = synthos ? 0 : podzial.brak.ilosc
+              const caly = brakIlosc > 0 && brakIlosc >= m.ilosc
+              const zaDuzo = !synthos && (m.brak_ilosc ?? 0) > m.ilosc
               return (
-                <tr key={m.klucz} className={synthos ? 'bg-slate-50 text-slate-500' : m.brak ? 'bg-red-50 text-red-700' : undefined}>
+                <tr key={m.klucz} className={synthos ? 'bg-slate-50 text-slate-500' : caly ? 'bg-red-50 text-red-700' : undefined}>
                   <td className="komorka p-0">
                     <KomorkaNazwy
                       wartosc={m.nazwa}
@@ -154,16 +160,23 @@ export function TabelaMaterialow({ materialy, ustaw, edycja }: Props) {
                   <td className="komorka liczba font-medium">
                     {synthos ? '-' : zl(zNarzutem)}
                     {!synthos && m.ilosc > 0 && <span className="block text-[10px] font-normal text-slate-400">{zl(cenaJednMaterialu(m))} / {m.jm}</span>}
+                    {brakIlosc > 0 && !caly && (
+                      <span className="block text-[10px] font-semibold text-red-700">
+                        w tym brak {brakIlosc.toLocaleString('pl-PL')} {m.jm} = {zl(podzial.brak.wartosc)}
+                      </span>
+                    )}
                   </td>
                   <td className="komorka p-0">
                     <input className="pole-komorki" disabled={!edycja} value={m.numer_faktury ?? ''} aria-label="Dokument zakupu (PZ/FZ)"
                       onKeyDown={dodajPrzyEnter(i)}
                       onChange={(e) => zmien(m, { numer_faktury: e.target.value || null })} />
                   </td>
-                  <td className="komorka text-center">
+                  <td className={cn('komorka p-0', brakIlosc > 0 && 'bg-red-50')}
+                    title={zaDuzo ? `Brak (${m.brak_ilosc}) większy niż ilość (${m.ilosc})` : 'Ile z tej ilości nie sprzedajemy w tym zleceniu (zamawiający nie założył)'}>
                     {!synthos && (
-                      <input type="checkbox" disabled={!edycja} checked={!!m.brak} aria-label="Brak - nie sprzedajemy w tym zleceniu"
-                        className="accent-red-600" onChange={(e) => zmien(m, { brak: e.target.checked })} />
+                      <PoleLiczby wartosc={m.brak_ilosc ?? 0} disabled={!edycja} aria-label="Brak - ilość niesprzedana w tym zleceniu"
+                        placeholder="0" className={cn(brakIlosc > 0 && 'font-semibold text-red-700', zaDuzo && 'ring-1 ring-red-500')}
+                        zmien={(n) => zmien(m, { brak_ilosc: n })} />
                     )}
                   </td>
                   <td className="komorka text-center">

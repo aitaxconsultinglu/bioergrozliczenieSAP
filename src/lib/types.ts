@@ -102,8 +102,8 @@ export interface PozycjaMaterialowa {
   numer_faktury: string | null
   /** Tylko w formularzu: cena zakupu za JM - trzymana osobno, żeby nie zginęła, gdy ilość chwilowo = 0 (np. przy wpisywaniu „0,5”). */
   cena_zakupu?: number
-  /** Brak: materiał zużyty, ale niesprzedany w tym zleceniu (zamawiający go nie założył) - w XLSX na czerwono. */
-  brak?: boolean
+  /** Brak: ile z tej ilości zużyto, ale nie sprzedajemy w tym zleceniu (zamawiający nie założył) - w XLSX na czerwono. */
+  brak_ilosc?: number
 }
 
 /** Usługa obca (np. wyważanie zlecone firmie zewnętrznej) - sprzedawana z narzutem, w SAP pod „Usługa obca + 10%”. */

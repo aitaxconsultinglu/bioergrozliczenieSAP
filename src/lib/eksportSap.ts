@@ -26,7 +26,7 @@
  *     jeśli kierownik go wpisał, opis/JM/cena wpisane ręcznie. Panel oznacza takie
  *     zlecenia do weryfikacji przez dział handlowy.
  */
-import { cenaJednMaterialu, cenaUslugi, czySynthos, grosze, przydzielBraki, wartoscMaterialu, wartoscUslugi, wartoscUslugiObcej } from './obliczenia'
+import { cenaJednMaterialu, cenaUslugi, czySynthos, grosze, podzialMaterialu, przydzielBraki, wartoscUslugi, wartoscUslugiObcej } from './obliczenia'
 import type { Dostawca, PozycjaCennika } from './types'
 
 /** Pełny wiersz rozliczenia (11 pól z BRIEF 3.5) - z niego powstaje układ do wklejenia. */
@@ -104,8 +104,8 @@ export interface ZlecenieDoEksportu {
     kolejnosc: number
     jm?: string
     numer_faktury?: string | null
-    /** Materiał niesprzedany w tym zleceniu (brak zgłoszony zamawiającemu). */
-    brak?: boolean
+    /** Ile z tej ilości nie sprzedajemy w tym zleceniu (brak zgłoszony zamawiającemu). */
+    brak_ilosc?: number
   }[]
   /** Braki godzin: część przepracowanych godzin z komórki siatki, której zamawiający nie założył. */
   braki_godzin?: { ilosc_rbg: number; cennik_pozycje: PozycjaCennika | null }[]
@@ -169,11 +169,14 @@ export function liniiSap(z: ZlecenieDoEksportu, materialy: MaterialWgKategorii):
   const mat = kategoriaMaterialu(z, materialy)
   for (const m of [...z.pozycje_materialowe].sort((a, b) => a.kolejnosc - b.kolejnosc)) {
     if (czySynthos(m.dostawca)) continue
-    const wartosc = wartoscMaterialu(m)
-    dodaj([
+    // Brak części ilości: linia sprzedana (reszta) + linia braku (brakujące sztuki) z tą samą ceną jednostkową.
+    const { sprzedane, brak } = podzialMaterialu(m)
+    const wiersz = (wartosc: number, ilosc: number): WierszSap => [
       z.linia_materialy ?? null, INDEKS_MATERIALU, m.nazwa.slice(0, MAKS_KROTKI_TEKST), wartosc, null,
-      mat?.jm ?? 'JD', 1, wartosc, cenaJednMaterialu(m), Number(m.ilosc), null,
-    ], !!m.brak)
+      mat?.jm ?? 'JD', 1, wartosc, cenaJednMaterialu(m), ilosc, null,
+    ]
+    if (sprzedane.ilosc > 0 || !brak.ilosc) dodaj(wiersz(sprzedane.wartosc, sprzedane.ilosc))
+    if (brak.ilosc) dodaj(wiersz(brak.wartosc, brak.ilosc), true)
   }
   for (const u of [...(z.uslugi_obce ?? [])].sort((a, b) => a.kolejnosc - b.kolejnosc)) {
     const wartosc = wartoscUslugiObcej(u)
@@ -270,14 +273,19 @@ export function wierszeSzczegolow(z: ZlecenieDoEksportu): (string | number | nul
   }
   for (const m of [...z.pozycje_materialowe].sort((a, b) => a.kolejnosc - b.kolejnosc)) {
     const synthos = czySynthos(m.dostawca)
-    const zNarzutem = synthos ? 0 : wartoscMaterialu(m)
-    wynik.push([
-      nr, z.nazwa, z.mpk, synthos ? 'Materiał Synthos (bez rozliczenia)' : m.brak ? `${PREFIKS_BRAKU} materiału (nie sprzedany)` : 'Materiał', synthos ? null : z.linia_materialy ?? null,
-      synthos ? '' : INDEKS_MATERIALU, m.nazwa, Number(m.ilosc), m.jm ?? '',
-      synthos ? 0 : cenaJednMaterialu(m), zNarzutem, synthos ? 0 : m.wartosc_zakupu,
-      synthos ? 0 : m.narzut_proc, synthos ? 0 : grosze(zNarzutem - m.wartosc_zakupu), m.numer_faktury ?? '',
-      synthos ? 'Synthos' : m.dostawca === 'bioerg' ? 'Bioerg' : m.dostawca,
-    ])
+    const dostawca = synthos ? 'Synthos' : m.dostawca === 'bioerg' ? 'Bioerg' : m.dostawca
+    if (synthos) {
+      wynik.push([nr, z.nazwa, z.mpk, 'Materiał Synthos (bez rozliczenia)', null, '', m.nazwa, Number(m.ilosc), m.jm ?? '',
+        0, 0, 0, 0, 0, m.numer_faktury ?? '', dostawca])
+      continue
+    }
+    const { sprzedane, brak } = podzialMaterialu(m)
+    const wiersz = (rodzaj: string, czesc: { ilosc: number; wartosc: number; zakup: number }) => [
+      nr, z.nazwa, z.mpk, rodzaj, z.linia_materialy ?? null, INDEKS_MATERIALU, m.nazwa, czesc.ilosc, m.jm ?? '',
+      cenaJednMaterialu(m), czesc.wartosc, czesc.zakup, m.narzut_proc, grosze(czesc.wartosc - czesc.zakup), m.numer_faktury ?? '', dostawca,
+    ]
+    if (sprzedane.ilosc > 0 || !brak.ilosc) wynik.push(wiersz('Materiał', sprzedane))
+    if (brak.ilosc) wynik.push(wiersz(`${PREFIKS_BRAKU} materiału (nie sprzedany)`, brak))
   }
   for (const u of [...(z.uslugi_obce ?? [])].sort((a, b) => a.kolejnosc - b.kolejnosc)) {
     const wartosc = wartoscUslugiObcej(u)
